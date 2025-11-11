@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  spam-arrester-agent:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: spam-arrester-agent
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      # Persist TDLib session data
+      - tdlib-data:/app/tdlib-data
+      - tdlib-files:/app/tdlib-files
+      # Persist logs
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - spam-arrester-net
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  tdlib-data:
+    driver: local
+  tdlib-files:
+    driver: local
+
+networks:
+  spam-arrester-net:
+    driver: bridge

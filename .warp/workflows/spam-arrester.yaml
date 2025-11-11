@@ -1,0 +1,204 @@
+name: Spam Arrester Workflows
+command: spam-arrester
+description: Development workflows for the Telegram Spam Arrester project
+
+workflows:
+  # Setup & Installation
+  - name: setup
+    description: Initial project setup - install dependencies
+    command: |
+      echo "📦 Installing agent dependencies..."
+      cd agent && npm install
+    
+  - name: setup-python
+    description: Install Python ML dependencies (future)
+    command: |
+      if [ -f requirements.txt ]; then
+        pip install -r requirements.txt
+      else
+        echo "⚠️  No requirements.txt found yet - ML components coming in Phase 2"
+      fi
+
+  # Development
+  - name: dev
+    description: Run agent in development mode with hot reload
+    command: cd agent && npm run dev
+
+  - name: build
+    description: Build TypeScript agent
+    command: cd agent && npm run build
+
+  - name: start
+    description: Start the agent in production mode
+    command: cd agent && npm start
+
+  # Testing & Quality
+  - name: test
+    description: Run all tests
+    command: cd agent && npm test
+
+  - name: lint
+    description: Lint TypeScript code
+    command: cd agent && npm run lint
+
+  - name: lint-python
+    description: Lint Python code (when available)
+    command: |
+      if command -v ruff &> /dev/null; then
+        ruff check .
+      else
+        echo "⚠️  ruff not installed. Install with: pip install ruff"
+      fi
+
+  - name: typecheck-python
+    description: Type check Python code (when available)
+    command: |
+      if command -v mypy &> /dev/null; then
+        mypy src/
+      else
+        echo "⚠️  mypy not installed. Install with: pip install mypy"
+      fi
+
+  # Docker Operations
+  - name: docker-up
+    description: Start all services with Docker Compose
+    command: docker-compose up -d
+
+  - name: docker-down
+    description: Stop all Docker services
+    command: docker-compose down
+
+  - name: docker-logs
+    description: View Docker container logs
+    command: docker-compose logs -f spam-arrester-agent
+
+  - name: docker-build
+    description: Build Docker images
+    command: docker-compose build
+
+  - name: docker-restart
+    description: Restart Docker services
+    command: docker-compose restart
+
+  # Authentication & Session Management
+  - name: reset-session
+    description: Clear TDLib session data (re-authentication required)
+    command: |
+      echo "⚠️  This will log you out and require re-authentication"
+      read -p "Continue? (y/n) " -n 1 -r
+      echo
+      if [[ $REPLY =~ ^[Yy]$ ]]; then
+        rm -rf agent/tdlib-data/
+        echo "✅ Session cleared. Run 'npm start' to authenticate again"
+      fi
+
+  # Logs & Monitoring
+  - name: logs
+    description: View agent logs in real-time
+    command: tail -f logs/agent.log
+
+  - name: logs-all
+    description: View all logs
+    command: tail -f logs/*.log
+
+  - name: clean-logs
+    description: Archive and clean old logs
+    command: |
+      mkdir -p logs/archive
+      if ls logs/*.log 1> /dev/null 2>&1; then
+        mv logs/*.log logs/archive/
+        echo "✅ Logs archived to logs/archive/"
+      else
+        echo "No logs to clean"
+      fi
+
+  # Configuration
+  - name: edit-config
+    description: Edit agent configuration
+    command: ${EDITOR:-nano} config/default.json
+
+  - name: edit-env
+    description: Edit environment variables
+    command: ${EDITOR:-nano} .env
+
+  - name: show-config
+    description: Display current configuration
+    command: |
+      echo "=== Environment ==="
+      cat .env 2>/dev/null | grep -v "API_HASH\|PASSWORD" || echo "No .env file found"
+      echo ""
+      echo "=== Config ==="
+      cat config/default.json 2>/dev/null || echo "No config file found"
+
+  # Cleanup & Maintenance
+  - name: clean
+    description: Clean build artifacts and node_modules
+    command: |
+      echo "🧹 Cleaning build artifacts..."
+      rm -rf agent/dist agent/node_modules
+      echo "✅ Clean complete"
+
+  - name: clean-all
+    description: Deep clean including Docker volumes
+    command: |
+      echo "🧹 Deep cleaning project..."
+      rm -rf agent/dist agent/node_modules
+      docker-compose down -v
+      echo "✅ Deep clean complete"
+
+  # Metrics & Status
+  - name: status
+    description: Check agent status and recent metrics
+    command: |
+      if docker ps | grep -q spam-arrester-agent; then
+        echo "✅ Agent is running (Docker)"
+      elif pgrep -f "node.*spam-arrester" > /dev/null; then
+        echo "✅ Agent is running (Native)"
+      else
+        echo "❌ Agent is not running"
+      fi
+      echo ""
+      echo "Recent metrics (last 10 lines):"
+      tail -n 10 logs/agent.log 2>/dev/null | grep -i "metric\|spam" || echo "No metrics found"
+
+  # Git Operations
+  - name: git-status
+    description: Show git status and recent changes
+    command: git --no-pager status
+
+  - name: git-diff
+    description: Show uncommitted changes
+    command: git --no-pager diff
+
+  # Quick Start
+  - name: quickstart
+    description: Complete setup and first run
+    command: |
+      echo "🚀 Spam Arrester Quick Start"
+      echo ""
+      echo "1️⃣  Installing dependencies..."
+      cd agent && npm install
+      echo ""
+      echo "2️⃣  Building project..."
+      npm run build
+      echo ""
+      echo "3️⃣  Checking configuration..."
+      if [ ! -f ../.env ]; then
+        echo "⚠️  No .env file found!"
+        echo "Copy .env.example to .env and add your Telegram API credentials"
+        cp ../.env.example ../.env
+        echo "📝 Created .env from template"
+        echo ""
+        echo "Please edit .env with your credentials:"
+        echo "  - Get API credentials from https://my.telegram.org/apps"
+        echo "  - Add TG_API_ID and TG_API_HASH"
+        echo ""
+        echo "Then run: npm start"
+      else
+        echo "✅ Configuration found"
+        echo ""
+        echo "4️⃣  Ready to start!"
+        echo "Run: npm start"
+        echo ""
+        echo "📖 See QUICKSTART.md for authentication steps"
+      fi
