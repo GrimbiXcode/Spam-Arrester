@@ -1,30 +1,44 @@
 version: '3.8'
 
 services:
-  spam-arrester-agent:
+  # Phase 2: Orchestrator Bot
+  orchestrator:
     build:
       context: .
-      dockerfile: docker/Dockerfile
-    container_name: spam-arrester-agent
+      dockerfile: docker/Dockerfile.bot
+    container_name: spam-arrester-orchestrator
     env_file:
-      - .env
+      - bot/.env
     environment:
       - NODE_ENV=production
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DB_PATH=/app/data/orchestrator.db
+      - SESSIONS_DIR=/app/sessions
+      - HOST_SESSIONS_DIR=${PWD}/sessions
+      - CONFIG_DIR=/app/config
+      - HOST_CONFIG_DIR=${PWD}/config
+      - DOCKER_SOCKET=/var/run/docker.sock
     volumes:
-      # Persist TDLib session data
-      - tdlib-data:/app/tdlib-data
-      - tdlib-files:/app/tdlib-files
-      # Persist logs
-      - ./logs:/app/logs
+      # Access to Docker socket for container management
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Database persistence
+      - ./data:/app/data
+      # Sessions directory (mounted into agent containers)
+      - ./sessions:/app/sessions
+      # Config directory (shared with agent containers)
+      - ./config:/app/config:ro
     restart: unless-stopped
     networks:
-      - spam-arrester-net
-    # Security options
+      - agent-network
+    # Run as root for Docker socket access (required for container orchestration)
+    # Note: This is acceptable for the orchestrator service which manages other containers
+    user: "0:0"
     security_opt:
       - no-new-privileges:true
+    # Note: Needs docker socket access, so can't drop all capabilities
     cap_drop:
-      - ALL
+      - NET_ADMIN
+      - SYS_ADMIN
 
 volumes:
   tdlib-data:
@@ -33,5 +47,8 @@ volumes:
     driver: local
 
 networks:
-  spam-arrester-net:
+  agent-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.54.0.0/16

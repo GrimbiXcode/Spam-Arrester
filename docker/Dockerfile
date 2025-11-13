@@ -1,4 +1,11 @@
-FROM node:20-alpine
+FROM --platform=linux/amd64 node:20-slim
+
+# Install build dependencies for native modules (tdl requires them)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set up app directory
 WORKDIR /app
@@ -20,8 +27,8 @@ RUN npm run build
 RUN mkdir -p tdlib-data tdlib-files logs
 
 # Run as non-root user
-RUN addgroup -g 1001 -S appuser && \
-    adduser -u 1001 -S appuser -G appuser && \
+RUN groupadd -g 1001 appuser && \
+    useradd -u 1001 -g appuser -m -s /bin/bash appuser && \
     chown -R appuser:appuser /app
 
 USER appuser

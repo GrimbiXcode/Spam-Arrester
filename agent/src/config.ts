@@ -43,7 +43,8 @@ interface Config {
 }
 
 function loadConfig(): Config {
-  const configPath = join(__dirname, '../../config/default.json');
+  // In Docker, config is mounted at /app/config; otherwise use relative path
+  const configPath = process.env.CONFIG_PATH || join(__dirname, '../../config/default.json');
   const configFile = JSON.parse(readFileSync(configPath, 'utf-8'));
 
   const apiId = process.env.TG_API_ID;

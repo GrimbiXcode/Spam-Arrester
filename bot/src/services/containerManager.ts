@@ -14,17 +14,24 @@ export class ContainerManager {
   private docker: Docker;
   private sessionsDir: string;
   private configDir: string;
+  private hostSessionsDir: string;
+  private hostConfigDir: string;
   private agentImage: string;
 
   constructor(
     dockerSocket: string,
     sessionsDir: string,
     configDir: string,
-    agentImage: string
+    agentImage: string,
+    hostSessionsDir?: string,
+    hostConfigDir?: string
   ) {
     this.docker = new Docker({ socketPath: dockerSocket });
     this.sessionsDir = resolve(sessionsDir);
     this.configDir = resolve(configDir);
+    // For Docker-in-Docker, use host paths if provided, otherwise use local paths
+    this.hostSessionsDir = hostSessionsDir || this.sessionsDir;
+    this.hostConfigDir = hostConfigDir || this.configDir;
     this.agentImage = agentImage;
   }
 
@@ -56,11 +63,12 @@ export class ContainerManager {
           `ENABLE_DELETION=${settings.enable_deletion ? 'true' : 'false'}`,
           `ENABLE_BLOCKING=${settings.enable_blocking ? 'true' : 'false'}`,
           `LOG_LEVEL=${process.env.LOG_LEVEL || 'info'}`,
+          `CONFIG_PATH=/app/config/default.json`,
         ],
         HostConfig: {
           Binds: [
-            `${this.sessionsDir}/${telegramId}:/app/tdlib-data:rw`,
-            `${this.configDir}:/app/config:ro`,
+            `${this.hostSessionsDir}/${telegramId}:/app/tdlib-data:rw`,
+            `${this.hostConfigDir}:/app/config:ro`,
           ],
           RestartPolicy: {
             Name: 'unless-stopped',

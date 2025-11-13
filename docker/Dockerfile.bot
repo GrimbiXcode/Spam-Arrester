@@ -31,8 +31,10 @@ COPY --from=builder /build/dist ./dist
 COPY bot/src/db/schema.sql ./dist/db/
 
 # Create non-root user
+# Add to dialout group (GID 20) which matches macOS Docker socket 'staff' group
 RUN addgroup -g 1001 -S botuser && \
     adduser -u 1001 -S botuser -G botuser && \
+    adduser botuser dialout && \
     chown -R botuser:botuser /app
 
 USER botuser
