@@ -12,7 +12,7 @@
   },
   "keywords": ["telegram", "tdlib", "spam", "detection"],
   "author": "",
-  "license": "MIT",
+  "license": "GNU GPL V3",
   "dependencies": {
     "tdl": "^7.3.2",
     "prebuilt-tdlib": "^0.1008056.0",
