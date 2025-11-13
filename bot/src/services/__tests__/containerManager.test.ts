@@ -91,6 +91,31 @@ describe('ContainerManager', () => {
         
         expect(result).toBe(4000000000); // 4 * 1e9
       });
+
+      it('should handle edge case with "0" CPU limit', () => {
+        const parseCpuLimit = (containerManager as any).parseCpuLimit.bind(containerManager);
+        
+        const result = parseCpuLimit('0');
+        
+        expect(result).toBe(0); // 0 * 1e9 = 0
+      });
+
+      it('should handle negative values for CPU limits', () => {
+        const parseCpuLimit = (containerManager as any).parseCpuLimit.bind(containerManager);
+        
+        const result = parseCpuLimit('-1');
+        
+        // parseFloat handles negative values, returns negative nanocpus
+        expect(result).toBe(-1000000000); // -1 * 1e9
+      });
+
+      it('should handle very small positive values', () => {
+        const parseCpuLimit = (containerManager as any).parseCpuLimit.bind(containerManager);
+        
+        const result = parseCpuLimit('0.001');
+        
+        expect(result).toBe(1000000); // 0.001 * 1e9
+      });
     });
 
     describe('parseMemoryLimit', () => {
@@ -337,6 +362,81 @@ describe('ContainerManager', () => {
         await expect(
           containerManager.createContainer(mockConfig)
         ).rejects.toThrow('Docker error');
+      });
+
+      it('should handle missing apiId in ContainerConfig', async () => {
+        const invalidConfig: ContainerConfig = {
+          telegramId: 12345,
+          apiId: '', // Empty string
+          apiHash: 'test-api-hash',
+          settings: mockSettings,
+        };
+
+        mockDockerGetContainer.mockReturnValueOnce({
+          inspect: jest.fn().mockRejectedValue({ statusCode: 404 }),
+        });
+
+        await containerManager.createContainer(invalidConfig);
+
+        // Verify that the container was created with empty TG_API_ID
+        expect(mockDockerCreateContainer).toHaveBeenCalledWith(
+          expect.objectContaining({
+            Env: expect.arrayContaining([
+              'TG_API_ID=',
+              'TG_API_HASH=test-api-hash',
+            ]),
+          })
+        );
+      });
+
+      it('should handle null apiHash in ContainerConfig', async () => {
+        const invalidConfig = {
+          telegramId: 12345,
+          apiId: 'test-api-id',
+          apiHash: null as any, // null value
+          settings: mockSettings,
+        };
+
+        mockDockerGetContainer.mockReturnValueOnce({
+          inspect: jest.fn().mockRejectedValue({ statusCode: 404 }),
+        });
+
+        await containerManager.createContainer(invalidConfig);
+
+        // Verify that the container was created with null converted to string
+        expect(mockDockerCreateContainer).toHaveBeenCalledWith(
+          expect.objectContaining({
+            Env: expect.arrayContaining([
+              'TG_API_ID=test-api-id',
+              'TG_API_HASH=null',
+            ]),
+          })
+        );
+      });
+
+      it('should handle undefined properties in ContainerConfig', async () => {
+        const invalidConfig = {
+          telegramId: 12345,
+          apiId: undefined as any,
+          apiHash: undefined as any,
+          settings: mockSettings,
+        };
+
+        mockDockerGetContainer.mockReturnValueOnce({
+          inspect: jest.fn().mockRejectedValue({ statusCode: 404 }),
+        });
+
+        await containerManager.createContainer(invalidConfig);
+
+        // Verify that the container was created with undefined converted to string
+        expect(mockDockerCreateContainer).toHaveBeenCalledWith(
+          expect.objectContaining({
+            Env: expect.arrayContaining([
+              'TG_API_ID=undefined',
+              'TG_API_HASH=undefined',
+            ]),
+          })
+        );
       });
     });
 

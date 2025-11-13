@@ -362,6 +362,22 @@ describe('DatabaseManager', () => {
         expect(settings!.enable_deletion).toBe(1);
         expect(settings!.enable_blocking).toBe(1);
       });
+
+      it('should handle attempts to update settings for non-existent user without error', () => {
+        const nonExistentTelegramId = 99999999;
+
+        // This should not throw an error, but silently do nothing
+        expect(() => {
+          db.updateUserSettings(nonExistentTelegramId, {
+            low_threshold: 0.5,
+            enable_deletion: 1,
+          });
+        }).not.toThrow();
+
+        // Verify that no settings were created for the non-existent user
+        const settings = db.getUserSettings(nonExistentTelegramId);
+        expect(settings).toBeUndefined();
+      });
     });
   });
 
@@ -392,6 +408,17 @@ describe('DatabaseManager', () => {
         expect(logs).toHaveLength(1);
         expect(logs[0].event_type).toBe('container_started');
         expect(logs[0].details).toBe(JSON.stringify(details));
+      });
+
+      it('should handle details object containing non-JSON-serializable data', () => {
+        const telegramId = 12345;
+        const circularReference: any = { name: 'test' };
+        circularReference.self = circularReference; // Create circular reference
+
+        // JSON.stringify will throw TypeError for circular references
+        expect(() => {
+          db.addAuditLog(telegramId, 'test_event', circularReference);
+        }).toThrow(TypeError);
       });
     });
 
@@ -588,6 +615,25 @@ describe('DatabaseManager', () => {
         expect(logs).toHaveLength(1);
         expect(logs[0].event_type).toBe('recent_event');
       });
+
+      it('should handle gracefully when no old records are present', () => {
+        const telegramId = 12345;
+
+        // Add only recent logs
+        db.addAuditLog(telegramId, 'recent_event_1');
+        db.addAuditLog(telegramId, 'recent_event_2');
+
+        const beforeCleanup = db.getAuditLogs(telegramId);
+        expect(beforeCleanup).toHaveLength(2);
+
+        // Clean old logs - should not affect recent ones
+        expect(() => {
+          db.cleanOldAuditLogs(30);
+        }).not.toThrow();
+
+        const afterCleanup = db.getAuditLogs(telegramId);
+        expect(afterCleanup).toHaveLength(2);
+      });
     });
 
     describe('cleanOldMetrics', () => {
@@ -665,6 +711,31 @@ describe('DatabaseManager', () => {
         const latest = db.getLatestMetrics(telegramId);
         expect(latest).toBeDefined();
         expect(latest!.messages_processed).toBe(100);
+      });
+
+      it('should handle gracefully when no old records are present', () => {
+        const telegramId = 12345;
+
+        // Add only recent metrics
+        db.addMetricsSnapshot(telegramId, {
+          messages_processed: 50,
+          spam_detected: 5,
+          spam_archived: 5,
+          spam_blocked: 0,
+          spam_rate: 0.1,
+        });
+
+        const beforeCleanup = db.getLatestMetrics(telegramId);
+        expect(beforeCleanup).toBeDefined();
+
+        // Clean old metrics - should not affect recent ones
+        expect(() => {
+          db.cleanOldMetrics(90);
+        }).not.toThrow();
+
+        const afterCleanup = db.getLatestMetrics(telegramId);
+        expect(afterCleanup).toBeDefined();
+        expect(afterCleanup!.messages_processed).toBe(50);
       });
     });
   });
