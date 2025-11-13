@@ -1,0 +1,41 @@
+{
+  "name": "spam-arrester-bot",
+  "version": "0.1.0",
+  "description": "Telegram bot orchestrator for spam-arrester agent containers",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts",
+    "test": "jest"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "spam",
+    "orchestrator"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "telegraf": "^4.16.3",
+    "dockerode": "^4.0.2",
+    "better-sqlite3": "^11.3.0",
+    "pino": "^9.4.0",
+    "pino-pretty": "^11.2.2",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/dockerode": "^3.3.31",
+    "@types/node": "^22.7.9",
+    "@typescript-eslint/eslint-plugin": "^8.11.0",
+    "@typescript-eslint/parser": "^8.11.0",
+    "eslint": "^9.13.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.13"
+  }
+}

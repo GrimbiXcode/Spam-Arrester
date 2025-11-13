@@ -1,0 +1,44 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /build
+
+# Copy package files
+COPY bot/package*.json ./
+
+# Install all dependencies (including devDependencies for building)
+RUN npm ci && npm cache clean --force
+
+# Copy source
+COPY bot/tsconfig.json ./
+COPY bot/src ./src
+
+# Build TypeScript
+RUN npm run build
+
+# Production image
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install production dependencies only
+COPY bot/package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy built files
+COPY --from=builder /build/dist ./dist
+
+# Copy database schema
+COPY bot/src/db/schema.sql ./dist/db/
+
+# Create non-root user
+RUN addgroup -g 1001 -S botuser && \
+    adduser -u 1001 -S botuser -G botuser && \
+    chown -R botuser:botuser /app
+
+USER botuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); })"
+
+ENTRYPOINT ["node", "dist/index.js"]
