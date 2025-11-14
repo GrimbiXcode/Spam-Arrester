@@ -17,12 +17,14 @@ export class ContainerManager {
   private hostSessionsDir: string;
   private hostConfigDir: string;
   private agentImage: string;
+  private networkName: string;
 
   constructor(
     dockerSocket: string,
     sessionsDir: string,
     configDir: string,
     agentImage: string,
+    networkName: string,
     hostSessionsDir?: string,
     hostConfigDir?: string
   ) {
@@ -33,6 +35,7 @@ export class ContainerManager {
     this.hostSessionsDir = hostSessionsDir || this.sessionsDir;
     this.hostConfigDir = hostConfigDir || this.configDir;
     this.agentImage = agentImage;
+    this.networkName = networkName;
   }
 
   async createContainer(config: ContainerConfig): Promise<string> {
@@ -80,7 +83,7 @@ export class ContainerManager {
         },
         NetworkingConfig: {
           EndpointsConfig: {
-            'agent-network': {},
+            [this.networkName]: {},
           },
         },
       });
@@ -274,5 +277,155 @@ export class ContainerManager {
     };
     
     return value * multipliers[unit];
+  }
+
+  /**
+   * Get container IP address for HTTP communication
+   */
+  async getContainerIp(containerName: string): Promise<string | null> {
+    try {
+      const container = await this.getContainer(containerName);
+      if (!container) {
+        return null;
+      }
+
+      const info = await container.inspect();
+      return info.NetworkSettings.Networks[this.networkName]?.IPAddress || null;
+    } catch (error) {
+      logger.error({ containerName, error }, 'Failed to get container IP');
+      return null;
+    }
+  }
+
+  /**
+   * Helper to retry fetch with exponential backoff
+   */
+  private async fetchWithRetry(
+    url: string, 
+    options: RequestInit, 
+    maxRetries = 3, 
+    initialDelay = 1000
+  ): Promise<Response> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, options);
+        return response;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        logger.warn({ url, attempt, error: lastError.message }, 'Fetch attempt failed, retrying...');
+        
+        if (attempt < maxRetries - 1) {
+          const delay = initialDelay * Math.pow(2, attempt);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    throw lastError || new Error('Fetch failed after retries');
+  }
+
+  /**
+   * Send phone number to agent for authentication
+   */
+  async submitPhoneNumber(containerName: string, phoneNumber: string): Promise<void> {
+    try {
+      const response = await this.fetchWithRetry(
+        `http://${containerName}:3100/auth/phone`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone_number: phoneNumber }),
+        }
+      );
+
+      if (!response.ok) {
+        const error: any = await response.json();
+        throw new Error(error.details || 'Failed to submit phone number');
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('fetch')) {
+        throw new Error(`Cannot reach agent container ${containerName}:3100 - ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Send authentication code to agent
+   */
+  async submitAuthCode(containerName: string, code: string): Promise<void> {
+    try {
+      const response = await this.fetchWithRetry(
+        `http://${containerName}:3100/auth/code`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        }
+      );
+
+      if (!response.ok) {
+        const error: any = await response.json();
+        throw new Error(error.details || 'Failed to submit authentication code');
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('fetch')) {
+        throw new Error(`Cannot reach agent container ${containerName}:3100 - ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Send 2FA password to agent
+   */
+  async submit2FAPassword(containerName: string, password: string): Promise<void> {
+    try {
+      const response = await this.fetchWithRetry(
+        `http://${containerName}:3100/auth/password`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password }),
+        }
+      );
+
+      if (!response.ok) {
+        const error: any = await response.json();
+        throw new Error(error.details || 'Failed to submit 2FA password');
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('fetch')) {
+        throw new Error(`Cannot reach agent container ${containerName}:3100 - ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Parse auth state from container logs
+   */
+  async getAuthStateFromLogs(containerName: string): Promise<string | null> {
+    try {
+      const logs = await this.getContainerLogs(containerName, 50);
+      
+      // Look for auth event markers in logs
+      if (logs.includes('AUTH_WAIT_PHONE')) {
+        return 'wait_phone';
+      } else if (logs.includes('AUTH_WAIT_CODE')) {
+        return 'wait_code';
+      } else if (logs.includes('AUTH_WAIT_PASSWORD')) {
+        return 'wait_password';
+      } else if (logs.includes('AUTH_READY')) {
+        return 'ready';
+      }
+      
+      return 'none';
+    } catch (error) {
+      logger.error({ containerName, error }, 'Failed to parse auth state from logs');
+      return null;
+    }
   }
 }

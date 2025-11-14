@@ -33,4 +33,7 @@ RUN groupadd -g 1001 appuser && \
 
 USER appuser
 
+# Expose auth server port
+EXPOSE 3100
+
 CMD ["node", "dist/index.js"]

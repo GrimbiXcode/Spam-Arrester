@@ -167,11 +167,138 @@ export function createBot(
     }
   });
 
-  // Handle unknown commands
+  // Handle text messages (for authentication flow)
   bot.on('text', async (ctx) => {
     const text = ctx.message.text;
+    const telegramId = ctx.from?.id;
+
+    if (!telegramId) {
+      return;
+    }
+
+    // Handle commands
     if (text.startsWith('/')) {
       await ctx.reply('Unknown command. Send /help to see available commands.');
+      return;
+    }
+
+    // Check if user is in auth flow
+    const authSession = db.getAuthSession(telegramId);
+    if (!authSession) {
+      return; // Not in auth flow
+    }
+
+    const containerName = `agent-${telegramId}`;
+
+    try {
+      // Handle phone number input
+      if (authSession.auth_state === 'wait_phone') {
+        // Validate phone number format
+        if (!text.match(/^\+?[1-9]\d{1,14}$/)) {
+          await ctx.reply('❌ Invalid phone number format. Please use international format (e.g., +12025551234).');
+          return;
+        }
+
+        await ctx.reply('📲 Submitting phone number...');
+        
+        await containerMgr.submitPhoneNumber(containerName, text);
+        db.updateAuthState(telegramId, 'wait_code', text);
+        db.updateUserActivity(telegramId);
+
+        await ctx.reply(
+          '✅ Phone number submitted!\n\n' +
+          '💬 You should receive a verification code via SMS or Telegram.\n' +
+          'Please send the code when you receive it.',
+          { parse_mode: 'Markdown' }
+        );
+      }
+      // Handle verification code input
+      else if (authSession.auth_state === 'wait_code') {
+        // Validate code format (5-6 digits)
+        if (!text.match(/^\d{5,6}$/)) {
+          await ctx.reply('❌ Invalid code format. Please send the 5-6 digit code you received.');
+          return;
+        }
+
+        await ctx.reply('✔️ Verifying code...');
+        
+        try {
+          await containerMgr.submitAuthCode(containerName, text);
+          
+          // Wait a moment and check auth state
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const authState = await containerMgr.getAuthStateFromLogs(containerName);
+
+          if (authState === 'wait_password') {
+            db.updateAuthState(telegramId, 'wait_password');
+            await ctx.reply(
+              '🔐 **2FA Password Required**\n\n' +
+              'Your account has two-factor authentication enabled.\n' +
+              'Please send your 2FA password.',
+              { parse_mode: 'Markdown' }
+            );
+          } else if (authState === 'ready') {
+            db.updateAuthState(telegramId, 'ready');
+            await ctx.reply(
+              '✅ **Authentication Successful!**\n\n' +
+              'Your spam-arrester agent is now fully operational.\n' +
+              'It will monitor your private chats for spam.\n\n' +
+              'Use /status to view statistics.',
+              { parse_mode: 'Markdown' }
+            );
+          } else {
+            await ctx.reply('⚠️ Code submitted. Checking authentication status...');
+          }
+        } catch (error) {
+          await ctx.reply(
+            '❌ Failed to verify code.\n\n' +
+            'Error: ' + (error instanceof Error ? error.message : 'Unknown error') + '\n\n' +
+            'Please try again with the correct code.'
+          );
+        }
+      }
+      // Handle 2FA password input
+      else if (authSession.auth_state === 'wait_password') {
+        await ctx.reply('🔓 Verifying password...');
+        
+        try {
+          await containerMgr.submit2FAPassword(containerName, text);
+          
+          // Wait a moment and check auth state
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const authState = await containerMgr.getAuthStateFromLogs(containerName);
+
+          if (authState === 'ready') {
+            db.updateAuthState(telegramId, 'ready');
+            await ctx.reply(
+              '✅ **Authentication Successful!**\n\n' +
+              'Your spam-arrester agent is now fully operational.\n' +
+              'It will monitor your private chats for spam.\n\n' +
+              'Use /status to view statistics.',
+              { parse_mode: 'Markdown' }
+            );
+          } else {
+            await ctx.reply('⚠️ Password submitted. Checking authentication status...');
+          }
+        } catch (error) {
+          await ctx.reply(
+            '❌ Failed to verify password.\n\n' +
+            'Error: ' + (error instanceof Error ? error.message : 'Unknown error') + '\n\n' +
+            'Please try again with the correct password.'
+          );
+        }
+      }
+    } catch (error) {
+      logger.error({ 
+        telegramId, 
+        error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined
+      }, 'Error handling auth input');
+      await ctx.reply(
+        '❌ An error occurred. Please try /login again.\n\n' +
+        'Error: ' + (error instanceof Error ? error.message : 'Unknown error')
+      );
     }
   });
 

@@ -30,8 +30,17 @@ npm start
 # Lint TypeScript code
 npm run lint
 
-# Run tests
+# Run all tests
 npm test
+
+# Run tests with coverage
+npm test -- --coverage
+
+# Run a specific test file
+npm test -- src/handlers/__tests__/spamDetector.test.ts
+
+# Run tests in watch mode
+npm test -- --watch
 ```
 
 ### Development Workflow - Bot (Phase 2)
@@ -54,8 +63,17 @@ npm start
 # Lint TypeScript code
 npm run lint
 
-# Run tests
+# Run all tests
 npm test
+
+# Run tests with coverage
+npm test -- --coverage
+
+# Run a specific test file
+npm test -- src/commands/__tests__/status.test.ts
+
+# Run tests in watch mode
+npm test -- --watch
 ```
 
 ### Docker Deployment
@@ -66,9 +84,24 @@ docker-compose logs -f            # View logs
 docker-compose down               # Stop orchestrator
 docker-compose build              # Rebuild after changes
 
+# Build agent image manually (for development)
+cd agent && docker build -t spam-arrester-agent:latest -f ../docker/Dockerfile .
+
+# Build bot image manually
+cd bot && docker build -t spam-arrester-bot:latest -f ../docker/Dockerfile.bot ..
+
 # Agent containers are managed automatically by the bot
 # View agent container logs:
 docker logs spam-arrester-agent-<telegram-id>
+
+# List all agent containers
+docker ps -a --filter "name=spam-arrester-agent"
+
+# Inspect agent container
+docker inspect spam-arrester-agent-<telegram-id>
+
+# Clean up stopped agent containers
+docker container prune -f --filter "label=spam-arrester=agent"
 ```
 
 ### Setup
@@ -89,13 +122,24 @@ mkdir -p data sessions config
 
 ### Testing & Debugging
 ```bash
-# Clean authentication and restart
-rm -rf agent/tdlib-data/
-cd agent && npm start
+# Clean authentication and restart (from agent directory)
+rm -rf tdlib-data/
+npm start
 
-# Clean install if dependencies are corrupted
-rm -rf agent/node_modules agent/package-lock.json
-cd agent && npm install
+# Clean install if dependencies are corrupted (from agent directory)
+rm -rf node_modules package-lock.json
+npm install
+
+# Inspect SQLite database (from repository root)
+sqlite3 data/orchestrator.db "SELECT * FROM users;"
+sqlite3 data/orchestrator.db "SELECT * FROM containers;"
+sqlite3 data/orchestrator.db "SELECT * FROM settings;"
+
+# View database schema
+sqlite3 data/orchestrator.db ".schema"
+
+# Export database to SQL dump
+sqlite3 data/orchestrator.db .dump > backup.sql
 ```
 
 ## Architecture

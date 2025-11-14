@@ -38,6 +38,7 @@ describe('ContainerManager', () => {
   const sessionsDir = '/tmp/sessions';
   const configDir = '/tmp/config';
   const agentImage = 'spam-arrester-agent:latest';
+  const networkName = 'test-network';
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -45,7 +46,8 @@ describe('ContainerManager', () => {
       dockerSocket,
       sessionsDir,
       configDir,
-      agentImage
+      agentImage,
+      networkName
     );
   });
 
@@ -241,7 +243,7 @@ describe('ContainerManager', () => {
           },
           NetworkingConfig: {
             EndpointsConfig: {
-              'agent-network': {},
+              'test-network': {},
             },
           },
         });
@@ -263,7 +265,8 @@ describe('ContainerManager', () => {
           dockerSocket,
           sessionsDir,
           configDir,
-          agentImage
+          agentImage,
+          networkName
         );
 
         await containerManager.createContainer(mockConfig);
@@ -290,7 +293,8 @@ describe('ContainerManager', () => {
           dockerSocket,
           sessionsDir,
           configDir,
-          agentImage
+          agentImage,
+          networkName
         );
 
         await containerManager.createContainer(mockConfig);
@@ -615,7 +619,8 @@ describe('ContainerManager', () => {
         dockerSocket,
         sessionsDir,
         configDir,
-        agentImage
+        agentImage,
+        networkName
       );
 
       mockDockerGetContainer.mockReturnValueOnce({

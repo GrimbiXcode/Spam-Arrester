@@ -3,6 +3,8 @@ import { getTdjson } from 'prebuilt-tdlib';
 import { config } from './config';
 import { logger } from './utils/logger';
 import { MessageHandler } from './handlers/messageHandler';
+import { AuthHandler } from './handlers/authHandler';
+import { AuthServer } from './authServer';
 
 // Configure TDLib with prebuilt binary
 configure({ tdjson: getTdjson() });
@@ -32,6 +34,11 @@ async function main() {
   });
 
   const messageHandler = new MessageHandler();
+  const authHandler = new AuthHandler();
+  const authServer = new AuthServer(client, authHandler);
+
+  // Set up auth handler
+  authHandler.setupAuthHandler(client);
 
   // Set up update handlers
   client.on('update', async (update) => {
@@ -46,6 +53,9 @@ async function main() {
   });
 
   try {
+    // Start auth server
+    await authServer.start();
+
     // Connect to Telegram
     logger.info('Connecting to Telegram...');
     await client.connect();
@@ -59,6 +69,7 @@ async function main() {
 
   } catch (error) {
     logger.error({ error }, 'Failed to connect to Telegram');
+    await authServer.stop();
     process.exit(1);
   }
 
@@ -67,6 +78,7 @@ async function main() {
     logger.info('Shutting down...');
     const metrics = messageHandler.getMetrics();
     logger.info({ metrics }, 'Final metrics');
+    await authServer.stop();
     await client.close();
     process.exit(0);
   });
@@ -75,6 +87,7 @@ async function main() {
     logger.info('Shutting down...');
     const metrics = messageHandler.getMetrics();
     logger.info({ metrics }, 'Final metrics');
+    await authServer.stop();
     await client.close();
     process.exit(0);
   });

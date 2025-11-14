@@ -27,12 +27,14 @@ async function main() {
   const hostSessionsDir = process.env.HOST_SESSIONS_DIR; // Host path for Docker-in-Docker
   const hostConfigDir = process.env.HOST_CONFIG_DIR; // Host path for Docker-in-Docker
   const agentImage = process.env.AGENT_IMAGE || 'spam-arrester-agent:latest';
+  const networkName = process.env.AGENT_NETWORK || 'spam-arrester_agent-network';
 
   const containerMgr = new ContainerManager(
     dockerSocket,
     sessionsDir,
     configDir,
     agentImage,
+    networkName,
     hostSessionsDir,
     hostConfigDir
   );

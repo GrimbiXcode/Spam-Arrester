@@ -39,13 +39,12 @@ export async function loginCommand(
     authSession = db.getAuthSession(telegramId);
   }
 
-  // For MVP, we'll create the container directly
-  // In a full implementation, this would start an interactive auth flow
   try {
     await ctx.reply(
       '🚀 **Starting Your Agent**\n\n' +
       'Creating your spam-arrester container...\n' +
-      'This may take a moment.'
+      'This may take a moment.',
+      { parse_mode: 'Markdown' }
     );
 
     const settings = db.getUserSettings(telegramId);
@@ -75,20 +74,42 @@ export async function loginCommand(
     // Record in database
     db.createContainer(telegramId, containerId);
     db.updateUserStatus(telegramId, 'active');
-    db.updateAuthState(telegramId, 'ready');
     db.addAuditLog(telegramId, 'agent_started', { container_id: containerId });
 
     logger.info({ telegramId, containerId }, 'Agent container created');
 
-    await ctx.reply(
-      '✅ **Agent Started!**\n\n' +
-      'Your spam-arrester agent is now running.\n' +
-      'It will monitor your private chats for spam.\n\n' +
-      '**Note:** On first run, the agent will need to authenticate with Telegram.\n' +
-      'Check the container logs with /logs if needed.\n\n' +
-      'Use /status to monitor statistics.',
-      { parse_mode: 'Markdown' }
-    );
+    // Wait a moment for container to start
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Check auth state
+    const containerName = `agent-${telegramId}`;
+    const authState = await containerMgr.getAuthStateFromLogs(containerName);
+
+    if (authState === 'wait_phone' || authState === 'none') {
+      db.updateAuthState(telegramId, 'wait_phone');
+      await ctx.reply(
+        '📱 **Phone Number Required**\n\n' +
+        'Please send your phone number in international format.\n' +
+        'Example: +12025551234\n\n' +
+        '⚠️ Send it as a regular message (not using Telegram\'s phone sharing feature).',
+        { parse_mode: 'Markdown' }
+      );
+    } else if (authState === 'ready') {
+      db.updateAuthState(telegramId, 'ready');
+      await ctx.reply(
+        '✅ **Agent Started!**\n\n' +
+        'Your spam-arrester agent is now running.\n' +
+        'It will monitor your private chats for spam.\n\n' +
+        'Use /status to monitor statistics.',
+        { parse_mode: 'Markdown' }
+      );
+    } else {
+      await ctx.reply(
+        '⚠️ **Authentication Required**\n\n' +
+        'Your agent is starting. Check auth state with /status.',
+        { parse_mode: 'Markdown' }
+      );
+    }
   } catch (error) {
     logger.error({ telegramId, error }, 'Failed to start agent');
     await ctx.reply(
