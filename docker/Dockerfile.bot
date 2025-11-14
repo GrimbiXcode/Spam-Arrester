@@ -30,6 +30,9 @@ COPY --from=builder /build/dist ./dist
 # Copy database schema
 COPY bot/src/db/schema.sql ./dist/db/
 
+# Copy webapp static files to root (where path resolution expects it)
+COPY webapp /webapp
+
 # Create non-root user
 # Add to dialout group (GID 20) which matches macOS Docker socket 'staff' group
 RUN addgroup -g 1001 -S botuser && \

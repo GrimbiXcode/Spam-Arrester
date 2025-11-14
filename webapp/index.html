@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spam Arrester - Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 450px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        .step {
+            display: none;
+        }
+
+        .step.active {
+            display: block;
+        }
+
+        input[type="tel"],
+        input[type="password"] {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="tel"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .qr-container {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+
+        #qrcode {
+            display: inline-block;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px 0;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fee;
+            color: #c00;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .success {
+            background: #efe;
+            color: #080;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .info {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        a.bot-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 15px 30px;
+            background: #0088cc;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        a.bot-link:hover {
+            background: #006699;
+        }
+
+        .help-text {
+            font-size: 13px;
+            color: #888;
+            margin-top: 20px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Spam Arrester</h1>
+        <p class="subtitle">Telegram Spam Protection</p>
+
+        <!-- Step 1: Phone Input -->
+        <div id="step-phone" class="step active">
+            <div id="error-phone" class="error" style="display: none;"></div>
+            <input 
+                type="tel" 
+                id="phone-input" 
+                placeholder="+12025551234" 
+                pattern="\+[1-9]\d{1,14}"
+                required
+            >
+            <button id="submit-phone">Continue</button>
+            <p class="help-text">
+                Enter your Telegram phone number in international format (e.g., +12025551234)
+            </p>
+        </div>
+
+        <!-- Step 2: Loading -->
+        <div id="step-loading" class="step">
+            <div class="spinner"></div>
+            <p>Preparing authentication...</p>
+        </div>
+
+        <!-- Step 3: QR Code -->
+        <div id="step-qr" class="step">
+            <div class="info">Scan this QR code with your Telegram mobile app</div>
+            <div class="qr-container">
+                <div id="qrcode"></div>
+            </div>
+            <p class="help-text">
+                Open Telegram on your phone → Settings → Devices → Scan QR Code
+            </p>
+            <div class="spinner"></div>
+            <p>Waiting for confirmation...</p>
+        </div>
+
+        <!-- Step 4: Password -->
+        <div id="step-password" class="step">
+            <div class="info">Enter your Two-Factor Authentication password</div>
+            <div id="error-password" class="error" style="display: none;"></div>
+            <input 
+                type="password" 
+                id="password-input" 
+                placeholder="Enter 2FA password"
+                required
+            >
+            <button id="submit-password">Submit</button>
+            <p class="help-text">
+                This is your cloud password (2FA), not your phone passcode
+            </p>
+        </div>
+
+        <!-- Step 5: Success -->
+        <div id="step-success" class="step">
+            <div class="success">✅ Authentication successful!</div>
+            <p style="margin: 20px 0;">Your spam detection agent is now active.</p>
+            <a id="bot-link" href="#" class="bot-link">Open Bot →</a>
+            <p class="help-text">
+                Click the button above to start using the Spam Arrester bot
+            </p>
+        </div>
+
+        <!-- Step 6: Error -->
+        <div id="step-error" class="step">
+            <div class="error" id="error-message">Something went wrong</div>
+            <button id="retry-button">Try Again</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
+    <script>
+        const API_BASE = window.location.hostname === 'localhost' 
+            ? 'http://localhost:3000' 
+            : 'https://your-domain.com'; // Update with your actual domain
+
+        let currentToken = null;
+        let pollInterval = null;
+
+        // Step navigation
+        function showStep(stepName) {
+            document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+            document.getElementById(`step-${stepName}`).classList.add('active');
+        }
+
+        // Error handling
+        function showError(message, stepName = 'phone') {
+            const errorEl = document.getElementById(`error-${stepName}`);
+            if (errorEl) {
+                errorEl.textContent = message;
+                errorEl.style.display = 'block';
+            } else {
+                document.getElementById('error-message').textContent = message;
+                showStep('error');
+            }
+        }
+
+        // Phone submission
+        document.getElementById('submit-phone').addEventListener('click', async () => {
+            const phone = document.getElementById('phone-input').value.trim();
+            
+            if (!phone.match(/^\+[1-9]\d{1,14}$/)) {
+                showError('Invalid phone format. Use international format (e.g., +12025551234)', 'phone');
+                return;
+            }
+
+            showStep('loading');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/init-login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to initialize login');
+                }
+
+                currentToken = data.token;
+
+                if (data.status === 'already_authenticated') {
+                    // Already authenticated, skip to success
+                    document.getElementById('bot-link').href = data.bot_link;
+                    showStep('success');
+                } else {
+                    // Wait for QR code
+                    await pollForQrCode();
+                }
+
+            } catch (error) {
+                showError(error.message);
+            }
+        });
+
+        // Poll for QR code
+        async function pollForQrCode() {
+            let attempts = 0;
+            const maxAttempts = 30; // 30 seconds
+
+            const poll = async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/api/get-qr/${currentToken}`);
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to get QR code');
+                    }
+
+                    if (data.qr_link) {
+                        // Got QR code, display it
+                        displayQrCode(data.qr_link);
+                        startStatusPolling();
+                        return;
+                    }
+
+                    // Keep polling
+                    attempts++;
+                    if (attempts < maxAttempts) {
+                        setTimeout(poll, 1000);
+                    } else {
+                        throw new Error('Timeout waiting for QR code');
+                    }
+
+                } catch (error) {
+                    showError(error.message);
+                }
+            };
+
+            poll();
+        }
+
+        // Display QR code
+        function displayQrCode(link) {
+            showStep('qr');
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = ''; // Clear previous
+            
+            // QRCodeJS2 uses a different API
+            new QRCode(qrContainer, {
+                text: link,
+                width: 256,
+                height: 256,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+
+        // Poll for authentication status
+        function startStatusPolling() {
+            pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/api/check-status/${currentToken}`);
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to check status');
+                    }
+
+                    if (data.authenticated) {
+                        // Success!
+                        clearInterval(pollInterval);
+                        document.getElementById('bot-link').href = data.bot_link;
+                        showStep('success');
+                    } else if (data.status === 'wait_password') {
+                        // Need 2FA password
+                        clearInterval(pollInterval);
+                        showStep('password');
+                    }
+
+                } catch (error) {
+                    clearInterval(pollInterval);
+                    showError(error.message);
+                }
+            }, 2000); // Poll every 2 seconds
+        }
+
+        // Retry button
+        document.getElementById('retry-button').addEventListener('click', () => {
+            if (pollInterval) clearInterval(pollInterval);
+            currentToken = null;
+            document.getElementById('phone-input').value = '';
+            document.getElementById('error-phone').style.display = 'none';
+            showStep('phone');
+        });
+
+        // Password submission
+        document.getElementById('submit-password').addEventListener('click', async () => {
+            const password = document.getElementById('password-input').value;
+            
+            if (!password) {
+                showError('Password is required', 'password');
+                return;
+            }
+
+            // Hide any previous errors
+            document.getElementById('error-password').style.display = 'none';
+            document.getElementById('submit-password').disabled = true;
+            document.getElementById('submit-password').textContent = 'Submitting...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/submit-password/${currentToken}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to submit password');
+                }
+
+                // Password submitted, go back to waiting
+                showStep('loading');
+                document.getElementById('step-loading').querySelector('p').textContent = 'Verifying password...';
+                
+                // Start polling again for final authentication
+                startStatusPolling();
+
+            } catch (error) {
+                showError(error.message, 'password');
+                document.getElementById('submit-password').disabled = false;
+                document.getElementById('submit-password').textContent = 'Submit';
+            }
+        });
+
+        // Allow Enter key on phone input
+        document.getElementById('phone-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('submit-phone').click();
+            }
+        });
+
+        // Allow Enter key on password input
+        document.getElementById('password-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('submit-password').click();
+            }
+        });
+    </script>
+</body>
+</html>

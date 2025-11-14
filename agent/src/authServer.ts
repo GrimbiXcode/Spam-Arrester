@@ -87,6 +87,37 @@ export class AuthServer {
         });
       }
     });
+
+    // Request QR code authentication
+    this.app.post('/auth/qr/request', async (req: Request, res: Response) => {
+      try {
+        await this.authHandler.requestQrCode(this.client);
+        res.json({ success: true, message: 'QR code authentication requested' });
+      } catch (error) {
+        logger.error({ error }, 'Failed to request QR code');
+        res.status(500).json({ 
+          error: 'Failed to request QR code',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    });
+
+    // Get QR code link
+    this.app.get('/auth/qr', (req: Request, res: Response) => {
+      const qrLink = this.authHandler.getQrCodeLink();
+      const authState = this.authHandler.getAuthState();
+      
+      res.json({ 
+        qr_link: qrLink,
+        status: authState
+      });
+    });
+
+    // Get current authentication status
+    this.app.get('/auth/status', (req: Request, res: Response) => {
+      const authState = this.authHandler.getAuthState();
+      res.json({ status: authState });
+    });
   }
 
   /**

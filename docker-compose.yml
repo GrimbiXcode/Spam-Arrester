@@ -18,6 +18,10 @@ services:
       - CONFIG_DIR=/app/config
       - HOST_CONFIG_DIR=${PWD}/config
       - DOCKER_SOCKET=/var/run/docker.sock
+      - WEB_API_PORT=${WEB_API_PORT:-3000}
+    ports:
+      # Expose web API/webapp for authentication
+      - "${WEB_API_PORT:-3000}:${WEB_API_PORT:-3000}"
     volumes:
       # Access to Docker socket for container management
       - /var/run/docker.sock:/var/run/docker.sock

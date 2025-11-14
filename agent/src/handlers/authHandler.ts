@@ -7,6 +7,8 @@ import { logger } from '../utils/logger';
  */
 export class AuthHandler {
   private phoneNumber: string | null = null;
+  private qrCodeLink: string | null = null;
+  private authState: string = 'none';
 
   /**
    * Set up authorization state handler for TDLib client
@@ -32,21 +34,46 @@ export class AuthHandler {
 
       case 'authorizationStateWaitPhoneNumber':
         // Signal to orchestrator that we need phone number
+        this.authState = 'wait_phone';
         logger.info({ event: 'AUTH_WAIT_PHONE' }, 'Waiting for phone number');
+        break;
+
+      case 'authorizationStateWaitOtherDeviceConfirmation':
+        // QR code is ready - extract and convert the link
+        this.authState = 'wait_qr_confirmation';
+        const rawLink = authState.link || null;
+        
+        // Convert tg://login?token=... to https://t.me/login/...
+        if (rawLink && rawLink.startsWith('tg://login?token=')) {
+          const token = rawLink.replace('tg://login?token=', '');
+          this.qrCodeLink = `https://t.me/login/${token}`;
+        } else {
+          this.qrCodeLink = rawLink;
+        }
+        
+        logger.info({ 
+          event: 'AUTH_QR_READY', 
+          link: this.qrCodeLink,
+          rawLink 
+        }, 'QR code ready for scanning');
         break;
 
       case 'authorizationStateWaitCode':
         // Signal to orchestrator that we need SMS/Telegram code
+        this.authState = 'wait_code';
         logger.info({ event: 'AUTH_WAIT_CODE' }, 'Waiting for authentication code');
         break;
 
       case 'authorizationStateWaitPassword':
         // Signal to orchestrator that we need 2FA password
+        this.authState = 'wait_password';
         logger.info({ event: 'AUTH_WAIT_PASSWORD' }, 'Waiting for 2FA password');
         break;
 
       case 'authorizationStateReady':
         // Successfully authenticated
+        this.authState = 'ready';
+        this.qrCodeLink = null; // Clear QR code
         logger.info({ event: 'AUTH_READY' }, 'Successfully authenticated');
         break;
 
@@ -120,6 +147,40 @@ export class AuthHandler {
       logger.error({ error }, 'Failed to submit 2FA password');
       throw error;
     }
+  }
+
+  /**
+   * Request QR code login
+   */
+  async requestQrCode(client: Client): Promise<void> {
+    logger.info({ event: 'AUTH_QR_REQUESTED' }, 'Requesting QR code authentication');
+    
+    try {
+      // Request QR code authentication
+      await client.invoke({
+        _: 'requestQrCodeAuthentication',
+        other_user_ids: [], // Empty means any user can log in
+      });
+      this.authState = 'wait_qr';
+      logger.info('QR code authentication requested');
+    } catch (error) {
+      logger.error({ error }, 'Failed to request QR code');
+      throw error;
+    }
+  }
+
+  /**
+   * Get current QR code link
+   */
+  getQrCodeLink(): string | null {
+    return this.qrCodeLink;
+  }
+
+  /**
+   * Get current authentication state
+   */
+  getAuthState(): string {
+    return this.authState;
   }
 
   /**

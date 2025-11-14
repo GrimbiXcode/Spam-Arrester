@@ -3,6 +3,7 @@ import { resolve } from 'path';
 import { createBot } from './bot';
 import { DatabaseManager } from './db/database';
 import { ContainerManager } from './services/containerManager';
+import { WebApiServer } from './webApi';
 import { logger } from './utils/logger';
 
 async function main() {
@@ -40,6 +41,12 @@ async function main() {
   );
   logger.info('Container manager initialized');
 
+  // Create web API server
+  const webApiPort = parseInt(process.env.WEB_API_PORT || '3000', 10);
+  const webApi = new WebApiServer(db, containerMgr, webApiPort);
+  await webApi.start();
+  logger.info('Web API server initialized');
+
   // Create bot
   const bot = createBot(process.env.BOT_TOKEN!, db, containerMgr);
   logger.info('Bot created');
@@ -64,16 +71,18 @@ async function main() {
   }, 86400000); // Daily
 
   // Graceful shutdown
-  process.once('SIGINT', () => {
+  process.once('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down gracefully');
     bot.stop('SIGINT');
+    await webApi.stop();
     db.close();
     process.exit(0);
   });
 
-  process.once('SIGTERM', () => {
+  process.once('SIGTERM', async () => {
     logger.info('Received SIGTERM, shutting down gracefully');
     bot.stop('SIGTERM');
+    await webApi.stop();
     db.close();
     process.exit(0);
   });
@@ -84,6 +93,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  logger.error({ error }, 'Fatal error during startup');
+  logger.error({ message: error.message, stack: error.stack, originalError: error }, 'Fatal error during startup');
   process.exit(1);
 });

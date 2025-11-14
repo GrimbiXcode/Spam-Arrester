@@ -428,4 +428,83 @@ export class ContainerManager {
       return null;
     }
   }
+
+  /**
+   * Request QR code authentication from agent
+   */
+  async requestQrCode(containerName: string): Promise<void> {
+    try {
+      const response = await this.fetchWithRetry(
+        `http://${containerName}:3100/auth/qr/request`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (!response.ok) {
+        const error: any = await response.json();
+        throw new Error(error.details || 'Failed to request QR code');
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('fetch')) {
+        throw new Error(`Cannot reach agent container ${containerName}:3100 - ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get QR code link from agent
+   */
+  async getQrCode(containerName: string): Promise<{ qr_link: string | null; status: string }> {
+    try {
+      const response = await this.fetchWithRetry(
+        `http://${containerName}:3100/auth/qr`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to get QR code');
+      }
+
+      const data = await response.json() as { qr_link: string | null; status: string };
+      return data;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('fetch')) {
+        throw new Error(`Cannot reach agent container ${containerName}:3100 - ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get authentication status from agent
+   */
+  async getAuthStatus(containerName: string): Promise<string> {
+    try {
+      const response = await this.fetchWithRetry(
+        `http://${containerName}:3100/auth/status`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to get auth status');
+      }
+
+      const data = await response.json() as { status: string };
+      return data.status;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('fetch')) {
+        throw new Error(`Cannot reach agent container ${containerName}:3100 - ${error.message}`);
+      }
+      throw error;
+    }
+  }
 }
