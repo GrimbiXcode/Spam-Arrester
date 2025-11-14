@@ -1,19 +1,116 @@
-# Spam Arrester MVP - Setup Guide
+# Spam Arrester - Complete Setup Guide
+
+This guide covers setup for both deployment modes:
+- **Bot Orchestrator** (Phase 2) - Multi-user, managed containers
+- **Standalone Agent** (Phase 1) - Single-user, direct deployment
+
+---
 
 ## Prerequisites
 
 - Node.js 20+ and npm
-- Docker and Docker Compose (for containerized deployment)
+- Docker and Docker Compose
 - Telegram API credentials (API ID and API Hash)
+- Bot token (for orchestrator mode only)
 
-## Getting Your Telegram API Credentials
+## Getting Credentials
+
+### Telegram API Credentials (Required for both modes)
 
 1. Go to https://my.telegram.org/apps
 2. Log in with your Telegram account
 3. Create a new application
 4. Copy your `api_id` and `api_hash`
 
-## Local Development Setup
+### Bot Token (Required for orchestrator mode only)
+
+1. Message [@BotFather](https://t.me/BotFather) on Telegram
+2. Send `/newbot` and follow prompts
+3. Save the bot token provided
+
+---
+
+## Setup Option 1: Bot Orchestrator (Recommended)
+
+**Best for**: Production, multiple users, managed deployment
+
+### 1. Configure Bot
+
+```bash
+cd bot
+cp .env.example .env
+```
+
+Edit `bot/.env`:
+```bash
+BOT_TOKEN=your_bot_token_from_botfather
+TG_API_ID=your_api_id
+TG_API_HASH=your_api_hash
+DB_PATH=../data/orchestrator.db
+DOCKER_SOCKET=/var/run/docker.sock  # macOS: use ~/.docker/run/docker.sock
+SESSIONS_DIR=../sessions
+CONFIG_DIR=../config
+AGENT_IMAGE=spam-arrester-agent:latest
+LOG_LEVEL=info
+```
+
+### 2. Build Agent Docker Image
+
+```bash
+cd ../agent
+docker build -t spam-arrester-agent:latest -f ../docker/Dockerfile .
+```
+
+### 3. Setup Environment
+
+```bash
+cd ..
+mkdir -p data sessions config logs
+docker network create agent-network
+```
+
+### 4. Install Bot Dependencies
+
+```bash
+cd bot
+npm install
+```
+
+### 5. Start Bot
+
+**Development mode:**
+```bash
+npm run dev
+```
+
+**Production mode:**
+```bash
+npm run build
+npm start
+```
+
+**Using Docker Compose:**
+```bash
+cd ..
+docker-compose up -d
+```
+
+### 6. Use Bot via Telegram
+
+1. Find your bot in Telegram
+2. Send `/start` to register
+3. Send `/login` to create agent container
+4. Check logs with `/logs` for authentication
+5. Configure with `/settings`
+6. Monitor with `/status`
+
+See `BOT_IMPLEMENTATION_SUMMARY.md` for all available commands.
+
+---
+
+## Setup Option 2: Standalone Agent
+
+**Best for**: Single user, development, testing
 
 ### 1. Install Dependencies
 
@@ -91,9 +188,25 @@ docker-compose logs -f spam-arrester-agent
 docker-compose down
 ```
 
+---
+
 ## Configuration Guide
 
-### Detection Thresholds
+### For Bot Users (Option 1)
+
+Configuration is done via the `/settings` command in Telegram:
+- Adjust detection thresholds (low: 0.2/0.3/0.4, action: 0.7/0.85/0.9)
+- Set default action (log/archive/block)
+- Toggle deletion on/off
+- Toggle blocking on/off
+
+Changes are saved to the database and require container restart (`/pause` then `/resume`).
+
+### For Standalone Users (Option 2)
+
+Edit `config/default.json`:
+
+#### Detection Thresholds
 
 In `config/default.json`:
 
@@ -154,9 +267,20 @@ To avoid Telegram restrictions:
 
 When limits are exceeded, the agent falls back to archiving.
 
+---
+
 ## Monitoring
 
-### View Metrics
+### Bot Users (Option 1)
+
+Use Telegram commands:
+- `/status` - Current agent status and real-time metrics
+- `/stats` - Historical statistics with time period selection
+- `/logs` - View container logs (last 50 lines)
+
+### Standalone Users (Option 2)
+
+#### View Metrics
 
 Metrics are logged every minute:
 - `msgProcessedTotal`: Total messages analyzed

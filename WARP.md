@@ -6,14 +6,38 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 Spam Arrester is a modular, privacy-first Telegram spam detection and cleanup system. It uses TDLib, local LLMs, and vector similarity learning to automatically detect and delete spam messages in private Telegram chats while continuously improving detection accuracy.
 
-**Current Status**: MVP complete with heuristic-based detection. ML integration planned for Phase 2.
+**Current Status**: Phase 2 complete with bot orchestrator and multi-user support. ML integration planned for Phase 3.
 
 ## Essential Commands
 
-### Development Workflow
+### Development Workflow - Agent
 ```bash
-# Navigate to agent directory (all commands run from here)
+# Navigate to agent directory
 cd agent
+
+# Install dependencies
+npm install
+
+# Build TypeScript
+npm run build
+
+# Run in development mode (with ts-node)
+npm run dev
+
+# Run compiled version
+npm start
+
+# Lint TypeScript code
+npm run lint
+
+# Run tests
+npm test
+```
+
+### Development Workflow - Bot (Phase 2)
+```bash
+# Navigate to bot directory
+cd bot
 
 # Install dependencies
 npm install
@@ -37,17 +61,30 @@ npm test
 ### Docker Deployment
 ```bash
 # From repository root
-docker-compose up -d              # Start container
+docker-compose up -d              # Start orchestrator bot
 docker-compose logs -f            # View logs
-docker-compose down               # Stop container
+docker-compose down               # Stop orchestrator
 docker-compose build              # Rebuild after changes
+
+# Agent containers are managed automatically by the bot
+# View agent container logs:
+docker logs spam-arrester-agent-<telegram-id>
 ```
 
 ### Setup
 ```bash
-# First-time setup
+# First-time setup - Agent (Phase 1 standalone)
+cd agent
 cp .env.example .env              # Create environment file
 # Edit .env with TG_API_ID and TG_API_HASH from https://my.telegram.org/apps
+
+# First-time setup - Bot (Phase 2 orchestrator)
+cd bot
+cp .env.example .env              # Create environment file
+# Edit .env with BOT_TOKEN, TG_API_ID, and TG_API_HASH
+
+# Create required directories
+mkdir -p data sessions config
 ```
 
 ### Testing & Debugging
@@ -63,7 +100,25 @@ cd agent && npm install
 
 ## Architecture
 
-### Two-Stage Detection Pipeline
+### System Architecture (Phase 2)
+
+**Multi-User Orchestration**:
+```
+User (Telegram) → Orchestrator Bot → Container Manager → Docker API
+                         ↓                    ↓
+                    SQLite DB         Per-User Agent Containers
+                                              ↓
+                                         TDLib + Detection
+```
+
+**Key Features**:
+- Each user gets isolated container with dedicated TDLib session
+- Bot manages container lifecycle (create, start, stop, remove)
+- Database tracks users, containers, auth state, settings, metrics
+- Session data persisted in per-user volumes
+- Resource limits per container (0.5 CPU, 512M RAM)
+
+### Two-Stage Detection Pipeline (Per-Agent)
 
 1. **Heuristic Filter (Fast Path)** - Scoring system:
    - Sender not in contacts: +0.3
@@ -72,19 +127,27 @@ cd agent && npm install
    - Suspicious content (links/handles/phones): +0.4
    - Threshold: ≥0.3 flags as spam
 
-2. **LLM Classifier (Slow Path)** - Planned for Phase 2:
+2. **LLM Classifier (Slow Path)** - Planned for Phase 3:
    - Generate embeddings (SBERT-like)
    - Vector similarity lookup
    - Binary spam/ham classification
 
 ### Core Components
 
+**Agent (Per-User Container)**:
 - **TDLib Client** (`agent/src/index.ts`): Main entry point, connects to Telegram, handles lifecycle
 - **MessageHandler** (`agent/src/handlers/messageHandler.ts`): Processes incoming messages, orchestrates detection
 - **SpamDetector** (`agent/src/handlers/spamDetector.ts`): Implements heuristic scoring system
 - **ActionHandler** (`agent/src/handlers/actionHandler.ts`): Executes actions (archive/block/delete) with rate limiting
 - **RateLimiter** (`agent/src/utils/rateLimiter.ts`): Prevents hitting Telegram API limits
 - **Metrics** (`agent/src/utils/metrics.ts`): Tracks processed messages, spam detections, actions taken
+
+**Orchestrator Bot (Phase 2)**:
+- **Bot** (`bot/src/bot.ts`): Telegraf setup, command routing, callback handlers
+- **DatabaseManager** (`bot/src/db/database.ts`): SQLite operations for users, containers, settings, metrics
+- **ContainerManager** (`bot/src/services/containerManager.ts`): Docker API integration, container lifecycle
+- **Commands** (`bot/src/commands/*.ts`): Bot command handlers (start, status, stats, settings, login, pause, resume, stop, reset, logs)
+- **Logger** (`bot/src/utils/logger.ts`): Pino structured logging
 
 ### Data Flow
 
@@ -122,10 +185,24 @@ All behavior configured via `config/default.json`:
 - Delete `tdlib-data/` to re-authenticate
 
 ### Environment Variables
-Required in `.env`:
+
+**Agent** (`agent/.env`):
 - `TG_API_ID` - Get from https://my.telegram.org/apps
 - `TG_API_HASH` - Get from https://my.telegram.org/apps
 - `LOG_LEVEL` - Optional: debug|info|warn|error (default: info)
+
+**Bot** (`bot/.env`):
+- `BOT_TOKEN` - Get from @BotFather on Telegram
+- `TG_API_ID` - Get from https://my.telegram.org/apps (used for agent containers)
+- `TG_API_HASH` - Get from https://my.telegram.org/apps (used for agent containers)
+- `DB_PATH` - Optional: path to SQLite database (default: ../data/orchestrator.db)
+- `DOCKER_SOCKET` - Optional: Docker socket path (default: /var/run/docker.sock)
+- `SESSIONS_DIR` - Optional: sessions directory (default: ../sessions)
+- `CONFIG_DIR` - Optional: config directory (default: ../config)
+- `AGENT_IMAGE` - Optional: agent Docker image (default: spam-arrester-agent:latest)
+- `LOG_LEVEL` - Optional: debug|info|warn|error (default: info)
+- `CONTAINER_CPU_LIMIT` - Optional: CPU limit per container (default: 0.5)
+- `CONTAINER_MEMORY_LIMIT` - Optional: memory limit per container (default: 512M)
 
 ### TypeScript Patterns
 - Strict mode enabled
@@ -146,7 +223,45 @@ Required in `.env`:
 - Only analyzes messages from **non-contacts** (configurable)
 - Text extraction handles different message content types
 
+## Bot Commands (Phase 2)
+
+### User Commands
+
+- **`/start`** - Welcome message, creates user record, initializes default settings
+- **`/status`** - Shows agent status (running/stopped/paused/failed), uptime, current metrics, and settings
+- **`/stats`** - Interactive historical statistics with time period selection (24h/7d/30d/all), includes spam rate trends
+- **`/settings`** - Interactive configuration menu:
+  - Adjust default action (log/archive/block)
+  - Configure detection thresholds (low: 0.2/0.3/0.4, action: 0.7/0.85/0.9)
+  - Toggle deletion on/off
+  - Toggle blocking on/off
+  - All changes persist to database and require container restart
+- **`/login`** - Creates and starts agent container (simplified - manual TDLib auth on first run)
+- **`/pause`** - Stops agent container while preserving session
+- **`/resume`** - Restarts a paused agent container
+- **`/stop`** - Stops and removes container with confirmation dialog (preserves session data)
+- **`/reset`** - Complete reset with double confirmation (deletes ALL session data - cannot be undone)
+- **`/logs`** - Fetches last 50 lines of agent container logs
+- **`/help`** - Lists all available commands
+
+### Interactive Features
+
+- **Inline keyboards** for settings and stats
+- **Confirmation dialogs** for destructive actions (stop, reset)
+- **Real-time updates** when adjusting settings
+- **Emoji indicators** for visual clarity (✅ ❌ 🔴 🟢 🟡)
+- **Markdown formatting** for readability
+
+### Safety Features
+
+- Confirmation required for stop (1 step)
+- Double confirmation for reset (2 steps with warnings)
+- Clear messaging about data loss
+- Cancel options at all stages
+
 ## Testing Approach
+
+### Agent Testing (Phase 1 - Standalone)
 
 1. **Log-only mode**: Set `defaultAction: "log"` and `enableDeletion: false`
 2. **Send test messages**: From non-contact with links/handles/phones
@@ -156,6 +271,22 @@ Required in `.env`:
 6. **Enable blocking**: Set `enableBlocking: true` after validation
 7. **Final step**: Enable `enableDeletion: true` only after extensive testing
 
+### Bot Testing (Phase 2 - Orchestrator)
+
+1. **Unit tests**: Run `cd bot && npm test` (85/85 tests passing)
+2. **Build verification**: Run `cd bot && npm run build` (should compile cleanly)
+3. **Lint check**: Run `cd bot && npm run lint` (check for errors)
+4. **Bot interaction**:
+   - Send `/start` to register
+   - Send `/login` to create container
+   - Send `/status` to verify agent is running
+   - Send `/settings` to adjust configuration
+   - Send `/stats` to view metrics
+   - Send `/pause` and `/resume` to test lifecycle
+   - Send `/logs` to view agent output
+5. **Database verification**: Check `data/orchestrator.db` has correct entries
+6. **Container verification**: Run `docker ps` to see running agent containers
+
 ## Roadmap Context
 
 ### Phase 1: MVP ✅ Complete
@@ -164,18 +295,24 @@ Required in `.env`:
 - Metrics and logging
 - Docker deployment
 
-### Phase 2: Bot Interface & Orchestration (Planned)
-- Telegram bot for user login and initialization
-- Container orchestration for per-user TDLib instances
-- Session lifecycle management (QR/phone/code flows)
-- User settings and monitoring interface
-- Audit/management database for non-sensitive metadata
+### Phase 2: Bot Interface & Orchestration ✅ Complete
+- ✅ Telegram bot for user interaction
+- ✅ Container orchestration for per-user TDLib instances
+- ✅ User settings and monitoring interface
+- ✅ Audit/management database for non-sensitive metadata
+- ✅ All bot commands implemented (start, status, stats, settings, login, pause, resume, stop, reset, logs, help)
+- ✅ Interactive settings menus with inline keyboards
+- ✅ Container lifecycle management
+- ✅ Docker integration
+- ✅ Health monitoring system
+- 🚧 Full TDLib authentication flow (simplified for MVP - manual auth on first run)
 
 ### Phase 3: ML Integration (Planned)
 - Embedding generation service (Python FastAPI)
 - Vector DB (FAISS → Milvus/Weaviate)
 - Classifier training pipeline
 - Dry-run mode for model validation
+- Agent → Bot metrics streaming
 
 ### Phase 4: Learning System (Planned)
 - Multi-user verification backend
@@ -185,6 +322,8 @@ Required in `.env`:
 
 ## Key Metrics
 
+### Agent Metrics (Per-Container)
+
 Logged every minute via `messageHandler.getMetrics()`:
 - `msgProcessedTotal`: Total messages analyzed
 - `spamDetectedTotal`: Messages flagged as spam
@@ -193,6 +332,15 @@ Logged every minute via `messageHandler.getMetrics()`:
 - `spamRate`: Percentage of spam detected (0-1)
 - `remainingActions.deletes`: Remaining deletes this minute
 - `remainingActions.blocks`: Remaining blocks this minute
+
+### Bot Metrics (Orchestrator)
+
+Tracked in SQLite database:
+- Active containers per user
+- Container health status
+- Settings changes (audit log)
+- Historical metrics snapshots (90-day retention)
+- User activity (audit log with 30-day retention)
 
 ## Privacy & Security Principles
 
@@ -233,25 +381,64 @@ cd agent && npm start
 ```
 spam-arrester/
 ├── config/
-│   └── default.json           # All behavior configuration
-├── agent/                     # Node.js TDLib agent
+│   └── default.json                 # All behavior configuration
+├── agent/                           # Node.js TDLib agent (Phase 1)
 │   ├── src/
-│   │   ├── index.ts          # Entry point, TDLib client setup
-│   │   ├── config.ts         # Config loader
+│   │   ├── index.ts                # Entry point, TDLib client setup
+│   │   ├── config.ts               # Config loader
 │   │   ├── handlers/
-│   │   │   ├── messageHandler.ts    # Message processing orchestration
-│   │   │   ├── spamDetector.ts      # Heuristic scoring logic
-│   │   │   └── actionHandler.ts     # Action execution with rate limiting
-│   │   └── utils/
-│   │       ├── logger.ts            # Pino structured logging
-│   │       ├── metrics.ts           # Metrics tracking
-│   │       ├── rateLimiter.ts       # Rate limit enforcement
-│   │       └── heuristics.ts        # Spam pattern regex matching
-│   ├── package.json          # Dependencies (tdl, prebuilt-tdlib, pino)
-│   └── tsconfig.json         # TypeScript config (strict mode)
+│   │   │   ├── messageHandler.ts  # Message processing orchestration
+│   │   │   ├── spamDetector.ts    # Heuristic scoring logic
+│   │   │   └── actionHandler.ts   # Action execution with rate limiting
+│   │   ├── utils/
+│   │   │   ├── logger.ts          # Pino structured logging
+│   │   │   ├── metrics.ts         # Metrics tracking
+│   │   │   ├── rateLimiter.ts     # Rate limit enforcement
+│   │   │   └── heuristics.ts      # Spam pattern regex matching
+│   │   └── __tests__/             # Jest tests
+│   ├── package.json                # Dependencies (tdl, prebuilt-tdlib, pino)
+│   ├── tsconfig.json               # TypeScript config (strict mode)
+│   └── .env.example                # Agent environment template
+├── bot/                            # Telegram bot orchestrator (Phase 2)
+│   ├── src/
+│   │   ├── index.ts               # Entry point
+│   │   ├── bot.ts                 # Telegraf setup, callback handlers
+│   │   ├── commands/              # Bot command handlers
+│   │   │   ├── start.ts          # Welcome & registration
+│   │   │   ├── status.ts         # Agent status & metrics
+│   │   │   ├── stats.ts          # Historical statistics
+│   │   │   ├── settings.ts       # Interactive configuration
+│   │   │   ├── login.ts          # Container creation
+│   │   │   ├── pause.ts          # Pause agent
+│   │   │   ├── resume.ts         # Resume agent
+│   │   │   ├── stop.ts           # Stop with confirmation
+│   │   │   ├── reset.ts          # Reset with double confirmation
+│   │   │   └── logs.ts           # View container logs
+│   │   ├── db/
+│   │   │   ├── database.ts       # DatabaseManager class
+│   │   │   └── schema.sql        # SQLite schema
+│   │   ├── services/
+│   │   │   └── containerManager.ts  # Docker integration
+│   │   ├── utils/
+│   │   │   └── logger.ts         # Pino logger
+│   │   └── __tests__/            # Jest tests
+│   ├── package.json               # Dependencies (telegraf, dockerode, better-sqlite3)
+│   ├── tsconfig.json              # TypeScript config
+│   ├── .env.example               # Bot environment template
+│   └── README.md                  # Bot documentation
+├── sessions/                       # Per-user TDLib sessions (gitignored)
+│   └── {telegram_id}/             # Isolated per user
+├── data/                          # Management database (gitignored)
+│   └── orchestrator.db            # SQLite database
 ├── docker/
-│   └── Dockerfile            # Container build
-├── docker-compose.yml        # Orchestration with security hardening
-├── .env.example              # Environment template
-└── logs/                     # Runtime logs (gitignored)
+│   ├── Dockerfile                 # Agent container build
+│   └── Dockerfile.bot             # Bot container build
+├── docker-compose.yml             # Orchestrator deployment
+├── .env.example                   # Root environment template
+├── logs/                          # Runtime logs (gitignored)
+├── QUICKSTART.md                  # Quick start guide
+├── PHASE2_DESIGN.md               # Phase 2 architecture
+├── PHASE2_SETUP.md                # Phase 2 setup guide
+├── PHASE2_SUMMARY.md              # Phase 2 summary
+└── BOT_IMPLEMENTATION_SUMMARY.md  # Bot commands documentation
 ```

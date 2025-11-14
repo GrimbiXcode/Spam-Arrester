@@ -1,29 +1,58 @@
-# Telegram Spam Cleaner — Concept Overview
+# Spam Arrester
 
-A modular, privacy-first architecture for automatically detecting and deleting spam messages in **private Telegram chats** using **TDLib**, **local LLMs**, and **vector similarity learning**.
+A modular, privacy-first system for automatically detecting and handling spam in **private Telegram chats** using **TDLib**, heuristic detection, and planned **ML integration**.
+
+## 📌 Current Status
+
+- **✅ Phase 1 Complete**: Standalone agent with heuristic spam detection
+- **✅ Phase 2 Complete**: Multi-user bot orchestrator with containerized agents
+- **🚧 Phase 3 Planned**: ML integration with embeddings and vector similarity
 
 ---
 
 ## 🎯 Goal
 
-Provide an **autonomous client** that connects to Telegram through TDLib and automatically deletes or archives chats with unknown users that are likely spam — while continuously improving its detection accuracy via a local learning model and a shared, verified spam database.
+Provide an **autonomous system** that:
+- Connects to Telegram via TDLib
+- Automatically detects and handles spam in private chats
+- Uses heuristic scoring and (planned) ML-based classification
+- Supports multi-user deployment with isolated sessions
+- Maintains privacy with minimal data retention
+- Enables future collaborative spam learning
 
 ---
 
-## 🧩 High-Level Architecture
+## 🚀 Quick Start
 
-### Core Components
+See **QUICKSTART.md** for 5-minute setup guide.
 
-| Component | Role |
-|------------|------|
-| **Orchestrator / Controller** | Manages per-user containers, session lifecycles, and login flows (QR / phone / code). |
-| **User Containers (Ephemeral TDLib Agents)** | Each container runs an isolated TDLib instance and a lightweight logic layer (Node.js / Rust). |
-| **Local LLM / Classifier** | Performs semantic spam classification using embeddings and learned heuristics. |
-| **Vector DB** | Stores message embeddings, metadata, and similarity clusters for ongoing learning. |
-| **Public Spam DB** | Collects verified spam sender fingerprints (hashed, privacy-safe) after community verification. |
-| **Bot / Frontend** | Provides a simple user interface to initialize, log in, and monitor cleanup actions. |
-| **Audit / Management DB** | Stores non-sensitive metadata, user settings, and decision logs. |
-| **Human-in-the-loop Dashboard** | Allows human review of borderline or newly detected spam clusters. |
+**Two deployment modes:**
+1. **Bot Orchestrator** (Recommended) - Telegram bot managing per-user containers
+2. **Standalone Agent** - Direct TDLib client for single user
+
+---
+
+## 🧩 Architecture Overview
+
+### Implemented Components (✅ Phase 1 & 2)
+
+| Component | Status | Description |
+|-----------|--------|-------------|
+| **Agent** | ✅ Complete | TDLib client with heuristic spam detection |
+| **Bot Orchestrator** | ✅ Complete | Telegram bot managing per-user containers |
+| **Container Manager** | ✅ Complete | Docker integration for isolated agent instances |
+| **Management Database** | ✅ Complete | SQLite storing users, settings, metrics, audit logs |
+| **Detection Pipeline** | ✅ Complete | Two-stage heuristic filtering with configurable thresholds |
+| **Action Handler** | ✅ Complete | Archive/block/delete with rate limiting |
+
+### Planned Components (🚧 Phase 3+)
+
+| Component | Status | Description |
+|-----------|--------|-------------|
+| **Embedding Service** | 🚧 Planned | Python FastAPI for SBERT-like embeddings |
+| **Vector Database** | 🚧 Planned | FAISS for similarity search |
+| **ML Classifier** | 🚧 Planned | Semantic spam classification |
+| **Public Spam DB** | 🚧 Planned | Collaborative verified spam fingerprints |
 
 ---
 
@@ -143,16 +172,34 @@ Optional alternative: a **shared agent pool** (multi-session TDLib) for lower re
 
 ---
 
-## 🚧 MVP → Production Roadmap
+## 🗃️ Implementation Roadmap
 
-1. **Prototype single TDLib agent** with heuristic deletion rules.  
-2. Add **bot login interface** and container orchestration.  
-3. Integrate **embedding + vector similarity** search.  
-4. Train **simple classifier** with labeled data.  
-5. Launch **dry-run mode** (log decisions only).  
-6. Deploy **Vector DB + verification backend**.  
-7. Add **human review dashboard** and **public DB** publishing.  
-8. Harden security, apply rate limits, and perform **red-team tests**.  
+### ✅ Phase 1: MVP Agent (Complete)
+1. ✅ Single TDLib agent with heuristic rules
+2. ✅ Archive/block/delete actions with rate limiting
+3. ✅ Metrics tracking and logging
+4. ✅ Docker deployment support
+5. ✅ Comprehensive test coverage (67 tests)
+
+### ✅ Phase 2: Bot Orchestration (Complete)
+1. ✅ Telegram bot interface
+2. ✅ Per-user container isolation
+3. ✅ SQLite database for management
+4. ✅ Interactive settings and monitoring
+5. ✅ Health checks and container lifecycle
+6. ✅ 85 tests with full coverage
+
+### 🚧 Phase 3: ML Integration (Planned)
+1. 🚧 Embedding generation service (Python FastAPI)
+2. 🚧 Vector similarity search (FAISS)
+3. 🚧 Hybrid heuristic + ML classifier
+4. 🚧 Multi-user learning feedback loop
+
+### 🚧 Phase 4: Collaborative Learning (Future)
+1. 🚧 Verification backend for spam fingerprints
+2. 🚧 Public spam database with privacy-safe hashing
+3. 🚧 Human review dashboard
+4. 🚧 Community-driven spam detection
 
 ---
 
@@ -182,7 +229,22 @@ Optional alternative: a **shared agent pool** (multi-session TDLib) for lower re
 
 ---
 
-## 🧪 Development Example (Node + TDLib)
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| **QUICKSTART.md** | 5-minute setup guide for both modes |
+| **SETUP.md** | Complete configuration and deployment guide |
+| **AGENT_SUMMARY.md** | Agent component features and architecture |
+| **BOT_IMPLEMENTATION_SUMMARY.md** | Complete bot command reference |
+| **PHASE2_SUMMARY.md** | Phase 2 implementation details |
+| **WARP.md** | Development guide (for AI assistants) |
+
+---
+
+## 🧪 Implementation Example (Node + TDLib)
 
 ```ts
 import { Client } from 'tdl'

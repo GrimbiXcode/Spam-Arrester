@@ -1,8 +1,8 @@
-# Spam Arrester MVP - Completion Summary
+# Spam Arrester Agent - Component Summary
 
-## ✅ Implementation Complete
+## ✅ Phase 1 Complete
 
-The MVP of Spam Arrester is now ready for testing! Here's what has been built:
+The agent component of Spam Arrester is a standalone TDLib client that detects and handles spam in private Telegram chats. This can be run standalone or orchestrated via the bot (Phase 2).
 
 ## 🎯 Core Features Implemented
 
@@ -127,14 +127,20 @@ Start with these settings to monitor for false positives before enabling more ag
 4. **Gradually enable actions** once confident in detection
 5. **Monitor metrics** to track performance
 
-## 📈 What's Next (Phase 2)
+## 📈 Integration Options
 
-After validating the MVP, consider:
-1. **ML Integration**: Add embedding generation and vector similarity
-2. **Verification System**: Build multi-user spam confirmation
-3. **Human Review Dashboard**: UI for reviewing borderline cases
-4. **Shared Spam DB**: Collaborate on verified spam patterns
-5. **Advanced Features**: Message history analysis, sender reputation
+This agent can be used in two ways:
+
+1. **Standalone Mode** (Phase 1): Run directly as a single-user daemon
+2. **Orchestrated Mode** (Phase 2): Deployed via the bot orchestrator in isolated containers
+
+## 🚀 Next Steps (Phase 3)
+
+Future ML integration:
+1. **Embedding Generation**: Add SBERT-like semantic analysis
+2. **Vector Database**: FAISS for similarity search
+3. **Multi-User Learning**: Learn from verified spam patterns across users
+4. **Shared Spam DB**: Collaborative spam fingerprint database
 
 ## 🛠 Configuration Tips
 
@@ -175,10 +181,10 @@ After validating the MVP, consider:
 
 ## 📚 Documentation
 
-- **SETUP.md**: Complete setup and configuration guide
-- **README.md**: Project concept and architecture
-- **.agentfile**: Technical architecture for AI agents
-- **Code comments**: Inline documentation in TypeScript files
+- **QUICKSTART.md**: Quick setup for standalone agent
+- **SETUP.md**: Complete configuration guide
+- **BOT_IMPLEMENTATION_SUMMARY.md**: For orchestrated (Phase 2) usage
+- **README.md**: Overall project concept
 
 ## 🔍 Key Files to Review
 
@@ -189,6 +195,8 @@ After validating the MVP, consider:
 
 ## ✨ Ready to Use
 
-The MVP is production-ready for conservative spam filtering. Start with archive mode, monitor results, and gradually adjust thresholds and actions based on your spam patterns.
+The agent is production-ready for conservative spam filtering. Start with archive mode, monitor results, and gradually adjust thresholds.
+
+**For multi-user deployment**, see the bot orchestrator (Phase 2) which manages per-user agent containers.
 
 Happy spam hunting! 🎯
