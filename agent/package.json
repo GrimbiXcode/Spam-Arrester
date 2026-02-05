@@ -1,6 +1,6 @@
 {
   "name": "spam-arrester-agent",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "TDLib-based Telegram spam detection agent",
   "main": "dist/index.js",
   "scripts": {
@@ -10,7 +10,12 @@
     "lint": "eslint src --ext .ts",
     "test": "jest"
   },
-  "keywords": ["telegram", "tdlib", "spam", "detection"],
+  "keywords": [
+    "telegram",
+    "tdlib",
+    "spam",
+    "detection"
+  ],
   "author": "",
   "license": "GNU GPL V3",
   "dependencies": {
