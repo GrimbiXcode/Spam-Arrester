@@ -26,21 +26,24 @@ export async function resetCommand(
 
   // Show first confirmation dialog
   await ctx.reply(
-    '⚠️ **DANGER: Reset Session**\n\n' +
+    '⚠️ *DANGER: Reset Session*\n\n' +
     'This will:\n' +
     '• Stop and remove your agent container\n' +
-    '• **DELETE ALL SESSION DATA**\n' +
-    '• **YOU WILL NEED TO RE-AUTHENTICATE**\n\n' +
+    '• *DELETE ALL SESSION DATA*\n' +
+    '• *YOU WILL NEED TO RE-AUTHENTICATE*\n\n' +
     '⚠️ This action CANNOT be undone!\n\n' +
     'Are you absolutely sure?',
-    Markup.inlineKeyboard([
-      [
-        Markup.button.callback('⚠️ Yes, Reset Everything', 'reset_confirm_1'),
-      ],
-      [
-        Markup.button.callback('❌ Cancel', 'reset_cancel'),
-      ],
-    ])
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [
+          Markup.button.callback('⚠️ Yes, Reset Everything', 'reset_confirm_1'),
+        ],
+        [
+          Markup.button.callback('❌ Cancel', 'reset_cancel'),
+        ],
+      ])
+    }
   );
 }
 
@@ -57,21 +60,24 @@ export async function confirmReset1(
   // Show second confirmation
   await ctx.answerCbQuery();
   await ctx.editMessageText(
-    '🚨 **FINAL WARNING**\n\n' +
+    '🚨 *FINAL WARNING*\n\n' +
     'This will permanently delete:\n' +
     '• Your Telegram session\n' +
     '• All authentication data\n' +
     '• Container and logs\n\n' +
-    '**This CANNOT be recovered!**\n\n' +
+    '*This CANNOT be recovered!*\n\n' +
     'Click "CONFIRM DELETE" to proceed:',
-    Markup.inlineKeyboard([
-      [
-        Markup.button.callback('🗑️ CONFIRM DELETE', 'reset_confirm_2'),
-      ],
-      [
-        Markup.button.callback('❌ Cancel', 'reset_cancel'),
-      ],
-    ])
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [
+          Markup.button.callback('🗑️ CONFIRM DELETE', 'reset_confirm_2'),
+        ],
+        [
+          Markup.button.callback('❌ Cancel', 'reset_cancel'),
+        ],
+      ])
+    }
   );
 }
 
@@ -122,12 +128,13 @@ export async function confirmReset2(
     logger.info({ telegramId }, 'Session reset by user');
 
     await ctx.editMessageText(
-      '✅ **Session Reset Complete**\n\n' +
+      '✅ *Session Reset Complete*\n\n' +
       'All data has been deleted:\n' +
       '✓ Container removed\n' +
       '✓ Session data deleted\n' +
       '✓ Authentication cleared\n\n' +
-      'You can start fresh with /login'
+      'You can start fresh with /login',
+      { parse_mode: 'Markdown' }
     );
   } catch (error) {
     logger.error({ telegramId, error }, 'Failed to reset session');

@@ -30,18 +30,21 @@ export async function stopCommand(
 
   // Show confirmation dialog
   await ctx.reply(
-    '⚠️ **Stop Agent**\n\n' +
+    '⚠️ *Stop Agent*\n\n' +
     'This will:\n' +
     '• Stop your spam-arrester agent\n' +
     '• Remove the container\n' +
     '• Keep your session data for future use\n\n' +
     'Are you sure?',
-    Markup.inlineKeyboard([
-      [
-        Markup.button.callback('✅ Yes, Stop', 'stop_confirm'),
-        Markup.button.callback('❌ Cancel', 'stop_cancel'),
-      ],
-    ])
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [
+          Markup.button.callback('✅ Yes, Stop', 'stop_confirm'),
+          Markup.button.callback('❌ Cancel', 'stop_cancel'),
+        ],
+      ])
+    }
   );
 }
 
@@ -79,10 +82,11 @@ export async function confirmStop(
 
     await ctx.answerCbQuery('✅ Agent stopped');
     await ctx.editMessageText(
-      '🛑 **Agent Stopped**\n\n' +
+      '🛑 *Agent Stopped*\n\n' +
       'Your spam-arrester agent has been stopped and removed.\n' +
       'Your session data is preserved.\n\n' +
-      'Send /login to start a new agent.'
+      'Send /login to start a new agent.',
+      { parse_mode: 'Markdown' }
     );
   } catch (error) {
     logger.error({ telegramId, error }, 'Failed to stop agent');

@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import { DatabaseManager } from './db/database';
 import { ContainerManager } from './services/containerManager';
 import { logger } from './utils/logger';
+import { preAuthTokens } from './commands/login';
 
 interface LoginSession {
   token: string;
@@ -69,7 +70,151 @@ export class WebApiServer {
       res.json({ status: 'ok' });
     });
 
-    // Initialize login with phone number
+    // Validate pre-auth token from bot and return telegram ID
+    this.app.get('/api/validate-token/:preAuthToken', async (req: Request, res: Response): Promise<void> => {
+      try {
+        const { preAuthToken } = req.params;
+        const tokenData = preAuthTokens.get(preAuthToken);
+
+        if (!tokenData) {
+          res.status(404).json({ valid: false, error: 'Token not found or expired' });
+          return;
+        }
+
+        // Check if token is expired (10 minutes)
+        if (Date.now() - tokenData.createdAt > 600000) {
+          preAuthTokens.delete(preAuthToken);
+          res.status(410).json({ valid: false, error: 'Token expired' });
+          return;
+        }
+
+        res.json({ valid: true, telegram_id: tokenData.telegramId });
+      } catch (error) {
+        logger.error({ error }, 'Failed to validate pre-auth token');
+        res.status(500).json({ valid: false, error: 'Internal error' });
+      }
+    });
+
+    // Initialize login with pre-auth token (from bot) - preferred method
+    this.app.post('/api/init-login-with-token', async (req: Request, res: Response): Promise<void> => {
+      try {
+        const { preAuthToken } = req.body;
+
+        if (!preAuthToken) {
+          res.status(400).json({ error: 'Pre-auth token is required' });
+          return;
+        }
+
+        // Validate the pre-auth token
+        const tokenData = preAuthTokens.get(preAuthToken);
+        if (!tokenData) {
+          res.status(404).json({ error: 'Invalid or expired token. Please use /login in the bot to get a new link.' });
+          return;
+        }
+
+        // Check if token is expired (10 minutes)
+        if (Date.now() - tokenData.createdAt > 600000) {
+          preAuthTokens.delete(preAuthToken);
+          res.status(410).json({ error: 'Token expired. Please use /login in the bot to get a new link.' });
+          return;
+        }
+
+        const telegramId = tokenData.telegramId;
+        logger.info({ telegramId, preAuthToken }, 'Initiating login via pre-auth token');
+
+        // Ensure user exists
+        let user = this.db.getUser(telegramId);
+        if (!user) {
+          res.status(400).json({ error: 'User not found. Please send /start to the bot first.' });
+          return;
+        }
+
+        // Generate session token
+        const sessionToken = randomBytes(32).toString('hex');
+        const containerName = `agent-${telegramId}`;
+
+        // Check if container exists and is authenticated
+        let containerStatus = await this.containerMgr.getContainerStatus(containerName);
+        if (containerStatus.status === 'running') {
+          const authStatus = await this.containerMgr.getAuthStatus(containerName);
+          if (authStatus === 'ready') {
+            res.json({
+              token: sessionToken,
+              telegram_id: telegramId,
+              status: 'already_authenticated',
+              bot_link: this.getBotLink(sessionToken),
+            });
+            return;
+          }
+        }
+
+        // Create container if needed
+        if (containerStatus.status === 'not_found') {
+          const settings = this.db.getUserSettings(telegramId);
+          if (!settings) {
+            throw new Error('User settings not found');
+          }
+
+          const dockerContainerId = await this.containerMgr.createContainer({
+            telegramId,
+            apiId: process.env.TG_API_ID!,
+            apiHash: process.env.TG_API_HASH!,
+            settings,
+          });
+
+          const existingContainer = this.db.getActiveContainer(telegramId);
+          if (existingContainer) {
+            this.db.updateContainerStatus(existingContainer.container_id, 'failed');
+          }
+
+          this.db.createContainer(telegramId, dockerContainerId);
+          await this.waitForContainer(containerName, 30000);
+          
+          // Request QR code from agent
+          const authStatus = await this.containerMgr.getAuthStatus(containerName);
+          if (authStatus === 'wait_phone' || authStatus === 'none') {
+            await this.containerMgr.requestQrCode(containerName);
+          }
+        } else if (containerStatus.status === 'running') {
+          // Container exists and is running, check if we need to request QR
+          const authStatus = await this.containerMgr.getAuthStatus(containerName);
+          if (authStatus === 'wait_phone' || authStatus === 'none') {
+            await this.containerMgr.requestQrCode(containerName);
+          }
+        }
+
+        // Store session (no phone needed since we have real telegram ID)
+        const session: LoginSession = {
+          token: sessionToken,
+          phone: '', // Not needed with pre-auth
+          telegramId,
+          containerName,
+          createdAt: Date.now(),
+          status: 'pending',
+        };
+        this.sessions.set(sessionToken, session);
+
+        // Consume the pre-auth token (one-time use)
+        preAuthTokens.delete(preAuthToken);
+
+        logger.info({ sessionToken, telegramId }, 'Login session created from pre-auth token');
+
+        res.json({
+          token: sessionToken,
+          telegram_id: telegramId,
+          status: 'qr_requested',
+        });
+
+      } catch (error) {
+        logger.error({ error }, 'Failed to initialize login with pre-auth token');
+        res.status(500).json({
+          error: 'Failed to initialize login',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    });
+
+    // Initialize login with phone number (legacy - kept for backwards compatibility)
     this.app.post('/api/init-login', async (req: Request, res: Response): Promise<void> => {
       try {
         const { phone } = req.body;

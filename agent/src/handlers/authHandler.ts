@@ -39,22 +39,14 @@ export class AuthHandler {
         break;
 
       case 'authorizationStateWaitOtherDeviceConfirmation':
-        // QR code is ready - extract and convert the link
+        // QR code is ready - use the raw tg:// link for Telegram's scanner
         this.authState = 'wait_qr_confirmation';
-        const rawLink = authState.link || null;
-        
-        // Convert tg://login?token=... to https://t.me/login/...
-        if (rawLink && rawLink.startsWith('tg://login?token=')) {
-          const token = rawLink.replace('tg://login?token=', '');
-          this.qrCodeLink = `https://t.me/login/${token}`;
-        } else {
-          this.qrCodeLink = rawLink;
-        }
+        // Use the raw tg://login?token=... link - Telegram's QR scanner expects this format
+        this.qrCodeLink = authState.link || null;
         
         logger.info({ 
           event: 'AUTH_QR_READY', 
           link: this.qrCodeLink,
-          rawLink 
         }, 'QR code ready for scanning');
         break;
 

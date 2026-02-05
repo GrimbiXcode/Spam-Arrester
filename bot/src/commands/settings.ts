@@ -45,12 +45,12 @@ export async function displaySettingsMenu(
   const blockingIcon = settings.enable_blocking ? '✅' : '❌';
 
   const message = 
-    '⚙️ **Settings**\n\n' +
-    `🎯 **Default Action:** ${settings.default_action}\n` +
-    `📊 **Low Threshold:** ${settings.low_threshold}\n` +
-    `📊 **Action Threshold:** ${settings.action_threshold}\n` +
-    `🗑️ **Deletion:** ${deletionIcon} ${settings.enable_deletion ? 'Enabled' : 'Disabled'}\n` +
-    `🚫 **Blocking:** ${blockingIcon} ${settings.enable_blocking ? 'Enabled' : 'Disabled'}\n\n` +
+    '⚙️ *Settings*\n\n' +
+    `🎯 *Default Action:* ${settings.default_action}\n` +
+    `📊 *Low Threshold:* ${settings.low_threshold}\n` +
+    `📊 *Action Threshold:* ${settings.action_threshold}\n` +
+    `🗑️ *Deletion:* ${deletionIcon} ${settings.enable_deletion ? 'Enabled' : 'Disabled'}\n` +
+    `🚫 *Blocking:* ${blockingIcon} ${settings.enable_blocking ? 'Enabled' : 'Disabled'}\n\n` +
     'Choose what to configure:';
 
   const keyboard = Markup.inlineKeyboard([
@@ -66,9 +66,9 @@ export async function displaySettingsMenu(
   ]);
 
   if (ctx.callbackQuery) {
-    await ctx.editMessageText(message, keyboard);
+    await ctx.editMessageText(message, { parse_mode: 'Markdown', ...keyboard });
   } else {
-    await ctx.reply(message, keyboard);
+    await ctx.reply(message, { parse_mode: 'Markdown', ...keyboard });
   }
 }
 
@@ -84,11 +84,11 @@ export async function handleActionSetting(
   if (!settings) return;
 
   const message = 
-    '🎯 **Default Action**\n\n' +
+    '🎯 *Default Action*\n\n' +
     'Choose what happens when spam is detected:\n\n' +
-    '**log** - Only log detection (safest)\n' +
-    '**archive** - Archive the chat (recommended)\n' +
-    '**block** - Block and delete (most aggressive)\n\n' +
+    '*log* - Only log detection (safest)\n' +
+    '*archive* - Archive the chat (recommended)\n' +
+    '*block* - Block and delete (most aggressive)\n\n' +
     `Current: ${settings.default_action}`;
 
   const keyboard = Markup.inlineKeyboard([
@@ -98,7 +98,7 @@ export async function handleActionSetting(
     [Markup.button.callback('🔙 Back', 'settings_menu')],
   ]);
 
-  await ctx.editMessageText(message, keyboard);
+  await ctx.editMessageText(message, { parse_mode: 'Markdown', ...keyboard });
 }
 
 export async function handleThresholdsSetting(
@@ -112,10 +112,10 @@ export async function handleThresholdsSetting(
   if (!settings) return;
 
   const message = 
-    '📊 **Detection Thresholds**\n\n' +
-    `**Low Threshold:** ${settings.low_threshold}\n` +
+    '📊 *Detection Thresholds*\n\n' +
+    `*Low Threshold:* ${settings.low_threshold}\n` +
     `Minimum score to flag as spam\n\n` +
-    `**Action Threshold:** ${settings.action_threshold}\n` +
+    `*Action Threshold:* ${settings.action_threshold}\n` +
     `Score to take blocking action\n\n` +
     'Adjust thresholds:';
 
@@ -133,7 +133,7 @@ export async function handleThresholdsSetting(
     [Markup.button.callback('🔙 Back', 'settings_menu')],
   ]);
 
-  await ctx.editMessageText(message, keyboard);
+  await ctx.editMessageText(message, { parse_mode: 'Markdown', ...keyboard });
 }
 
 export async function updateSetting(

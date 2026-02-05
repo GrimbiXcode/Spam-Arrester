@@ -22,17 +22,20 @@ export async function statsCommand(
 
   // Show time period selection
   await ctx.reply(
-    '📊 **Statistics**\n\nSelect a time period:',
-    Markup.inlineKeyboard([
-      [
-        Markup.button.callback('24 hours', 'stats_24h'),
-        Markup.button.callback('7 days', 'stats_7d'),
-      ],
-      [
-        Markup.button.callback('30 days', 'stats_30d'),
-        Markup.button.callback('All time', 'stats_all'),
-      ],
-    ])
+    '📊 *Statistics*\n\nSelect a time period:',
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [
+          Markup.button.callback('24 hours', 'stats_24h'),
+          Markup.button.callback('7 days', 'stats_7d'),
+        ],
+        [
+          Markup.button.callback('30 days', 'stats_30d'),
+          Markup.button.callback('All time', 'stats_all'),
+        ],
+      ])
+    }
   );
 }
 
@@ -70,9 +73,10 @@ export async function displayStats(
   if (metrics.length === 0) {
     await ctx.answerCbQuery();
     await ctx.editMessageText(
-      `📊 **Statistics - ${periodLabel}**\n\n` +
+      `📊 *Statistics - ${periodLabel}*\n\n` +
       '❌ No data available for this period.\n\n' +
-      'Your agent needs to be running to collect metrics.'
+      'Your agent needs to be running to collect metrics.',
+      { parse_mode: 'Markdown' }
     );
     return;
   }
@@ -101,7 +105,7 @@ export async function displayStats(
       sampled.push(metrics[i].spam_rate * 100);
     }
     
-    chart = '\n📈 **Spam Rate Trend:**\n';
+    chart = '\n📈 *Spam Rate Trend:*\n';
     const maxRate = Math.max(...sampled, 1);
     
     for (const rate of sampled.reverse()) {
@@ -111,20 +115,20 @@ export async function displayStats(
     }
   }
 
-  let message = `📊 **Statistics - ${periodLabel}**\n\n`;
-  message += `📨 **Messages Processed:** ${totalMessages}\n`;
-  message += `🚨 **Spam Detected:** ${totalSpam}\n`;
-  message += `📁 **Archived:** ${totalArchived}\n`;
-  message += `🚫 **Blocked:** ${totalBlocked}\n`;
-  message += `📈 **Average Spam Rate:** ${avgSpamRate}%\n`;
+  let message = `📊 *Statistics - ${periodLabel}*\n\n`;
+  message += `📨 *Messages Processed:* ${totalMessages}\n`;
+  message += `🚨 *Spam Detected:* ${totalSpam}\n`;
+  message += `📁 *Archived:* ${totalArchived}\n`;
+  message += `🚫 *Blocked:* ${totalBlocked}\n`;
+  message += `📈 *Average Spam Rate:* ${avgSpamRate}%\n`;
   
   if (chart) {
     message += chart;
   }
 
-  message += `\n🕐 **Data Points:** ${metrics.length} snapshots\n`;
+  message += `\n🕐 *Data Points:* ${metrics.length} snapshots\n`;
   message += `\nUse /status for current statistics.`;
 
   await ctx.answerCbQuery();
-  await ctx.editMessageText(message);
+  await ctx.editMessageText(message, { parse_mode: 'Markdown' });
 }

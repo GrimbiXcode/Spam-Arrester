@@ -1,7 +1,22 @@
-import { Context } from 'telegraf';
+import { Context, Markup } from 'telegraf';
+import { randomBytes } from 'crypto';
 import type { DatabaseManager } from '../db/database';
 import type { ContainerManager } from '../services/containerManager';
 import { logger } from '../utils/logger';
+
+// Store pre-auth tokens (token -> telegramId mapping)
+// This is exported so webApi can access it
+export const preAuthTokens = new Map<string, { telegramId: number; createdAt: number }>();
+
+// Clean up expired tokens (older than 10 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, data] of preAuthTokens.entries()) {
+    if (now - data.createdAt > 600000) {
+      preAuthTokens.delete(token);
+    }
+  }
+}, 60000);
 
 export async function loginCommand(
   ctx: Context,
@@ -42,25 +57,38 @@ export async function loginCommand(
     }
   }
 
-  // Redirect to web app for authentication
+  // Generate a pre-auth token linked to this user's real Telegram ID
+  const preAuthToken = randomBytes(32).toString('hex');
+  preAuthTokens.set(preAuthToken, { telegramId, createdAt: Date.now() });
+
+  // Redirect to web app for authentication with pre-auth token
   const webAppUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
-  
-  await ctx.reply(
-    '🔐 **Authentication Required**\n\n' +
+  const loginUrl = `${webAppUrl}?token=${preAuthToken}`;
+
+  const isLocalhost = loginUrl.includes('localhost') || loginUrl.includes('127.0.0.1');
+
+  const messageText =
+    '🔐 <b>Authentication Required</b>\n\n' +
     'To set up your spam detection agent, please authenticate via our secure web interface.\n\n' +
-    '👉 Click the link below to continue:\n' +
-    `${webAppUrl}\n\n` +
-    '**How it works:**\n' +
-    '1️⃣ Enter your phone number\n' +
-    '2️⃣ Scan the QR code with your Telegram mobile app\n' +
-    '3️⃣ Confirm the login in Telegram\n' +
+    (isLocalhost ? `👉 Open this link in your browser:\n<code>${loginUrl}</code>\n\n` : '') +
+    '<b>How it works:</b>\n' +
+    '1️⃣ Scan the QR code with your Telegram mobile app\n' +
+    '2️⃣ Confirm the login in Telegram\n' +
+    '3️⃣ Enter 2FA password if prompted\n' +
     '4️⃣ Return here to use the bot\n\n' +
-    '✅ Your credentials are never shared with us!',
-    { 
-      parse_mode: 'Markdown',
-      link_preview_options: { is_disabled: false }
-    }
-  );
-  
-  logger.info({ telegramId }, 'User redirected to web app for login');
+    '✅ Your credentials are never shared with us!';
+
+  // Telegram doesn't allow localhost URLs in inline buttons, so only add button for public URLs
+  if (isLocalhost) {
+    await ctx.reply(messageText, { parse_mode: 'HTML' });
+  } else {
+    await ctx.reply(messageText, {
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([
+        Markup.button.url('🔗 Open Login Page', loginUrl)
+      ])
+    });
+  }
+
+  logger.info({ telegramId, preAuthToken }, 'User redirected to web app for login with pre-auth token');
 }

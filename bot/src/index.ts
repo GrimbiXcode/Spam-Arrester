@@ -4,6 +4,7 @@ import { createBot } from './bot';
 import { DatabaseManager } from './db/database';
 import { ContainerManager } from './services/containerManager';
 import { WebApiServer } from './webApi';
+import { setWebApiRef } from './commands/start';
 import { logger } from './utils/logger';
 
 async function main() {
@@ -46,6 +47,9 @@ async function main() {
   const webApi = new WebApiServer(db, containerMgr, webApiPort);
   await webApi.start();
   logger.info('Web API server initialized');
+
+  // Set webApi reference for deep link verification in start command
+  setWebApiRef(webApi);
 
   // Create bot
   const bot = createBot(process.env.BOT_TOKEN!, db, containerMgr);
