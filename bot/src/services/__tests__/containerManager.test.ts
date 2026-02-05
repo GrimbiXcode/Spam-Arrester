@@ -227,6 +227,7 @@ describe('ContainerManager', () => {
             'ENABLE_DELETION=false',
             'ENABLE_BLOCKING=false',
             'LOG_LEVEL=info',
+            'CONFIG_PATH=/app/config/default.json',
           ],
           HostConfig: {
             Binds: [

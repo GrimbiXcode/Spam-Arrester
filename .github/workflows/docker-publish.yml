@@ -139,6 +139,9 @@ jobs:
 
       - name: Run tests
         working-directory: ./${{ matrix.component }}
+        env:
+          TG_API_ID: '12345'
+          TG_API_HASH: 'test_hash_for_ci'
         run: npm test
 
       - name: Build TypeScript
