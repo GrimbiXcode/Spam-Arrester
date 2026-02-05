@@ -17,6 +17,8 @@ env:
 
 jobs:
   build-and-push-agent:
+    # Only build and push images on tag pushes
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,6 +66,8 @@ jobs:
           cache-to: type=gha,mode=max
 
   build-and-push-bot:
+    # Only build and push images on tag pushes
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: read
