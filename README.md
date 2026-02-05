@@ -187,7 +187,8 @@ Optional alternative: a **shared agent pool** (multi-session TDLib) for lower re
 3. ✅ SQLite database for management
 4. ✅ Interactive settings and monitoring
 5. ✅ Health checks and container lifecycle
-6. ✅ 85 tests with full coverage
+6. ✅ Web-based QR authentication flow
+7. ✅ 85+ tests with full coverage
 
 ### 🚧 Phase 3: ML Integration (Planned)
 1. 🚧 Embedding generation service (Python FastAPI)
@@ -236,9 +237,12 @@ Optional alternative: a **shared agent pool** (multi-session TDLib) for lower re
 | Document | Description |
 |----------|-------------|
 | **QUICKSTART.md** | 5-minute setup guide for both modes |
+| **QUICKSTART_WEB_AUTH.md** | Web-based QR authentication setup |
 | **SETUP.md** | Complete configuration and deployment guide |
 | **AGENT_SUMMARY.md** | Agent component features and architecture |
 | **BOT_IMPLEMENTATION_SUMMARY.md** | Complete bot command reference |
+| **AUTH_IMPLEMENTATION.md** | Authentication system architecture |
+| **WEB_AUTH_IMPLEMENTATION.md** | Web auth API documentation |
 | **PHASE2_SUMMARY.md** | Phase 2 implementation details |
 | **WARP.md** | Development guide (for AI assistants) |
 

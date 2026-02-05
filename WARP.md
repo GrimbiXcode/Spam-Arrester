@@ -190,8 +190,13 @@ User (Telegram) → Orchestrator Bot → Container Manager → Docker API
 - **Bot** (`bot/src/bot.ts`): Telegraf setup, command routing, callback handlers
 - **DatabaseManager** (`bot/src/db/database.ts`): SQLite operations for users, containers, settings, metrics
 - **ContainerManager** (`bot/src/services/containerManager.ts`): Docker API integration, container lifecycle
+- **WebApiServer** (`bot/src/webApi.ts`): Express server for web-based QR authentication
 - **Commands** (`bot/src/commands/*.ts`): Bot command handlers (start, status, stats, settings, login, pause, resume, stop, reset, logs)
 - **Logger** (`bot/src/utils/logger.ts`): Pino structured logging
+
+**Web Authentication (Phase 2)**:
+- **Web App** (`webapp/index.html`): Single-page app for QR code login flow
+- **Web API** (`bot/src/webApi.ts`): REST endpoints for authentication (phone submission, QR retrieval, status polling)
 
 ### Data Flow
 
@@ -239,12 +244,20 @@ All behavior configured via `config/default.json`:
 - `BOT_TOKEN` - Get from @BotFather on Telegram
 - `TG_API_ID` - Get from https://my.telegram.org/apps (used for agent containers)
 - `TG_API_HASH` - Get from https://my.telegram.org/apps (used for agent containers)
+- `BOT_USERNAME` - Optional: bot's @username for deep links
+- `WEB_APP_URL` - Optional: URL for web authentication (default: http://localhost:3000)
+- `WEB_API_PORT` - Optional: port for web API server (default: 3000)
 - `DB_PATH` - Optional: path to SQLite database (default: ../data/orchestrator.db)
 - `DOCKER_SOCKET` - Optional: Docker socket path (default: /var/run/docker.sock)
 - `SESSIONS_DIR` - Optional: sessions directory (default: ../sessions)
 - `CONFIG_DIR` - Optional: config directory (default: ../config)
+- `HOST_SESSIONS_DIR` - Optional: host path for sessions (Docker-in-Docker)
+- `HOST_CONFIG_DIR` - Optional: host path for config (Docker-in-Docker)
 - `AGENT_IMAGE` - Optional: agent Docker image (default: spam-arrester-agent:latest)
+- `AGENT_NETWORK` - Optional: Docker network for agents (default: spam-arrester_agent-network)
 - `LOG_LEVEL` - Optional: debug|info|warn|error (default: info)
+- `MAX_CONTAINERS_PER_USER` - Optional: max containers per user (default: 1)
+- `AUTH_COOLDOWN_MINUTES` - Optional: cooldown between auth attempts (default: 5)
 - `CONTAINER_CPU_LIMIT` - Optional: CPU limit per container (default: 0.5)
 - `CONTAINER_MEMORY_LIMIT` - Optional: memory limit per container (default: 512M)
 
@@ -280,7 +293,7 @@ All behavior configured via `config/default.json`:
   - Toggle deletion on/off
   - Toggle blocking on/off
   - All changes persist to database and require container restart
-- **`/login`** - Creates and starts agent container (simplified - manual TDLib auth on first run)
+- **`/login`** - Redirects to web app for QR-based Telegram authentication, then creates agent container
 - **`/pause`** - Stops agent container while preserving session
 - **`/resume`** - Restarts a paused agent container
 - **`/stop`** - Stops and removes container with confirmation dialog (preserves session data)
@@ -349,7 +362,7 @@ All behavior configured via `config/default.json`:
 - ✅ Container lifecycle management
 - ✅ Docker integration
 - ✅ Health monitoring system
-- 🚧 Full TDLib authentication flow (simplified for MVP - manual auth on first run)
+- ✅ Web-based QR authentication flow
 
 ### Phase 3: ML Integration (Planned)
 - Embedding generation service (Python FastAPI)
@@ -447,12 +460,13 @@ spam-arrester/
 │   ├── src/
 │   │   ├── index.ts               # Entry point
 │   │   ├── bot.ts                 # Telegraf setup, callback handlers
+│   │   ├── webApi.ts              # Web API server for QR authentication
 │   │   ├── commands/              # Bot command handlers
 │   │   │   ├── start.ts          # Welcome & registration
 │   │   │   ├── status.ts         # Agent status & metrics
 │   │   │   ├── stats.ts          # Historical statistics
 │   │   │   ├── settings.ts       # Interactive configuration
-│   │   │   ├── login.ts          # Container creation
+│   │   │   ├── login.ts          # Web auth redirect
 │   │   │   ├── pause.ts          # Pause agent
 │   │   │   ├── resume.ts         # Resume agent
 │   │   │   ├── stop.ts           # Stop with confirmation
@@ -470,6 +484,8 @@ spam-arrester/
 │   ├── tsconfig.json              # TypeScript config
 │   ├── .env.example               # Bot environment template
 │   └── README.md                  # Bot documentation
+├── webapp/                         # Web-based authentication (Phase 2)
+│   └── index.html                 # Single-page app for QR login flow
 ├── sessions/                       # Per-user TDLib sessions (gitignored)
 │   └── {telegram_id}/             # Isolated per user
 ├── data/                          # Management database (gitignored)
@@ -481,8 +497,11 @@ spam-arrester/
 ├── .env.example                   # Root environment template
 ├── logs/                          # Runtime logs (gitignored)
 ├── QUICKSTART.md                  # Quick start guide
-├── PHASE2_DESIGN.md               # Phase 2 architecture
-├── PHASE2_SETUP.md                # Phase 2 setup guide
+├── QUICKSTART_WEB_AUTH.md         # Web authentication setup guide
+├── SETUP.md                       # Detailed setup guide
 ├── PHASE2_SUMMARY.md              # Phase 2 summary
-└── BOT_IMPLEMENTATION_SUMMARY.md  # Bot commands documentation
+├── AGENT_SUMMARY.md               # Agent component documentation
+├── BOT_IMPLEMENTATION_SUMMARY.md  # Bot commands documentation
+├── AUTH_IMPLEMENTATION.md         # Authentication architecture
+└── WEB_AUTH_IMPLEMENTATION.md     # Web auth API documentation
 ```
