@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 node:20-slim
+FROM node:20-slim
 
 # Install build dependencies for native modules (tdl requires them)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -13,8 +13,8 @@ WORKDIR /app
 # Copy package files
 COPY agent/package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies (need devDeps for TypeScript build)
+RUN npm ci
 
 # Copy source code
 COPY agent/ ./
@@ -22,6 +22,9 @@ COPY config/ ./config/
 
 # Build TypeScript
 RUN npm run build
+
+# Remove devDependencies after build
+RUN npm prune --omit=dev
 
 # Create directories for TDLib
 RUN mkdir -p tdlib-data tdlib-files logs
