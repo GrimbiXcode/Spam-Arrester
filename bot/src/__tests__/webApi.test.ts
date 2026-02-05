@@ -1,6 +1,9 @@
 import request from 'supertest';
 import express from 'express';
-import { preAuthTokens } from '../commands/login';
+import { preAuthTokens, stopTokenCleanup } from '../commands/login';
+
+// Use fake timers for deterministic time-based tests
+const MOCK_NOW = 1700000000000; // Fixed timestamp for tests
 
 // Mock logger
 jest.mock('../utils/logger', () => ({
@@ -106,9 +109,19 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
   let app: express.Express;
 
   beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(MOCK_NOW);
     jest.clearAllMocks();
     preAuthTokens.clear();
     app = createTestApp();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  afterAll(() => {
+    stopTokenCleanup();
   });
 
   describe('GET /api/validate-token/:preAuthToken', () => {
@@ -117,7 +130,7 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
       const token = 'valid_fresh_token';
       preAuthTokens.set(token, {
         telegramId,
-        createdAt: Date.now(),
+        createdAt: MOCK_NOW,
       });
 
       const response = await request(app)
@@ -142,7 +155,7 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
       const token = 'expired_token';
       preAuthTokens.set(token, {
         telegramId,
-        createdAt: Date.now() - (11 * 60 * 1000), // 11 minutes ago
+        createdAt: MOCK_NOW - (11 * 60 * 1000), // 11 minutes ago
       });
 
       const response = await request(app)
@@ -159,10 +172,9 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
     it('should accept token just under 10-minute boundary', async () => {
       const telegramId = 11111;
       const token = 'boundary_token';
-      // Use 599000ms (9 min 59 sec) to avoid timing issues in test execution
       preAuthTokens.set(token, {
         telegramId,
-        createdAt: Date.now() - 599000,
+        createdAt: MOCK_NOW - 599999, // 1ms under 10-minute limit
       });
 
       const response = await request(app)
@@ -178,7 +190,7 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
       const token = 'just_expired_token';
       preAuthTokens.set(token, {
         telegramId,
-        createdAt: Date.now() - 600001, // 10 minutes + 1ms ago
+        createdAt: MOCK_NOW - 600001, // 10 minutes + 1ms ago
       });
 
       const response = await request(app)
@@ -194,7 +206,7 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
       const token = 'user_token';
       preAuthTokens.set(token, {
         telegramId,
-        createdAt: Date.now() - (5 * 60 * 1000), // 5 minutes ago (valid)
+        createdAt: MOCK_NOW - (5 * 60 * 1000), // 5 minutes ago (valid)
       });
 
       const response = await request(app)
@@ -211,7 +223,7 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
       const token = 'valid_preauth_token';
       preAuthTokens.set(token, {
         telegramId,
-        createdAt: Date.now(),
+        createdAt: MOCK_NOW,
       });
 
       mockDb.getUser.mockReturnValue({ telegram_id: telegramId });
@@ -251,7 +263,7 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
       const token = 'expired_login_token';
       preAuthTokens.set(token, {
         telegramId,
-        createdAt: Date.now() - (15 * 60 * 1000), // 15 minutes ago
+        createdAt: MOCK_NOW - (15 * 60 * 1000), // 15 minutes ago
       });
 
       const response = await request(app)
@@ -270,7 +282,7 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
       const token = 'valid_token_no_user';
       preAuthTokens.set(token, {
         telegramId,
-        createdAt: Date.now(),
+        createdAt: MOCK_NOW,
       });
 
       mockDb.getUser.mockReturnValue(null);
@@ -288,7 +300,7 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
       const token = 'one_time_token';
       preAuthTokens.set(token, {
         telegramId,
-        createdAt: Date.now(),
+        createdAt: MOCK_NOW,
       });
 
       mockDb.getUser.mockReturnValue({ telegram_id: telegramId });
@@ -315,11 +327,11 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
       
       preAuthTokens.set(token1, {
         telegramId,
-        createdAt: Date.now() - (5 * 60 * 1000), // 5 minutes ago
+        createdAt: MOCK_NOW - (5 * 60 * 1000), // 5 minutes ago
       });
       preAuthTokens.set(token2, {
         telegramId,
-        createdAt: Date.now(), // Fresh
+        createdAt: MOCK_NOW, // Fresh
       });
 
       mockDb.getUser.mockReturnValue({ telegram_id: telegramId });
@@ -347,11 +359,9 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
     it('should handle validation request at the moment of expiration', async () => {
       const telegramId = 77777;
       const token = 'edge_case_token';
-      const createdAt = Date.now() - 599999; // Just under 10 minutes
-      
       preAuthTokens.set(token, {
         telegramId,
-        createdAt,
+        createdAt: MOCK_NOW - (9 * 60 * 1000), // 9 minutes ago, safely under 10
       });
 
       // Should still be valid
@@ -366,7 +376,7 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
       const token = 'to_be_deleted';
       preAuthTokens.set(token, {
         telegramId: 88888,
-        createdAt: Date.now() - (12 * 60 * 1000), // 12 minutes ago
+        createdAt: MOCK_NOW - (12 * 60 * 1000), // 12 minutes ago
       });
 
       expect(preAuthTokens.size).toBe(1);
@@ -383,7 +393,7 @@ describe('WebApiServer - Pre-auth Token Endpoints', () => {
       const token = 'concurrent_token';
       preAuthTokens.set(token, {
         telegramId,
-        createdAt: Date.now(),
+        createdAt: MOCK_NOW,
       });
 
       // Multiple concurrent requests

@@ -9,7 +9,7 @@ import { logger } from '../utils/logger';
 export const preAuthTokens = new Map<string, { telegramId: number; createdAt: number }>();
 
 // Clean up expired tokens (older than 10 minutes)
-setInterval(() => {
+const tokenCleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [token, data] of preAuthTokens.entries()) {
     if (now - data.createdAt > 600000) {
@@ -17,6 +17,11 @@ setInterval(() => {
     }
   }
 }, 60000);
+
+// Export for testing - allows stopping the interval
+export function stopTokenCleanup(): void {
+  clearInterval(tokenCleanupInterval);
+}
 
 export async function loginCommand(
   ctx: Context,
