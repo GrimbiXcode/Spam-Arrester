@@ -1,0 +1,43 @@
+# Environment files (may contain secrets)
+.env*
+!.env.example
+
+# Version control
+.git
+.gitignore
+
+# Dependencies (reinstalled in container)
+node_modules
+
+# Build artifacts
+dist
+build
+coverage
+.nyc_output
+
+# Runtime data
+sessions
+data
+logs
+*.log
+tdlib-data
+tdlib-files
+
+# IDE and OS
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Documentation (not needed in image)
+*.md
+!README.md
+
+# Tests (not needed in production image)
+**/__tests__
+**/*.test.ts
+**/*.spec.ts
+jest.config.*

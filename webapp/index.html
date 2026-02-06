@@ -96,6 +96,29 @@
             transform: none;
         }
 
+        .button-link {
+            display: inline-block;
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            text-decoration: none;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            margin-top: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .button-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .button-link:active {
+            transform: translateY(0);
+        }
+
         .qr-container {
             margin: 30px 0;
             padding: 20px;
@@ -210,8 +233,9 @@
             <div class="qr-container">
                 <div id="qrcode"></div>
             </div>
+            <a id="open-telegram" class="button-link" href="#" style="display: none;">Open in Telegram</a>
             <p class="help-text">
-                Open Telegram on your phone → Settings → Devices → Scan QR Code
+                If you are on the same device, tap “Open in Telegram”. Otherwise, scan the QR code in Telegram → Settings → Devices → Scan QR Code
             </p>
             <div class="spinner"></div>
             <p>Waiting for confirmation...</p>
@@ -419,6 +443,15 @@
             showStep('qr');
             const qrContainer = document.getElementById('qrcode');
             qrContainer.innerHTML = ''; // Clear previous
+
+            const openTelegramButton = document.getElementById('open-telegram');
+            if (link && link.startsWith('tg://login?token=')) {
+                openTelegramButton.href = link;
+                openTelegramButton.style.display = 'inline-block';
+            } else {
+                openTelegramButton.href = '#';
+                openTelegramButton.style.display = 'none';
+            }
             
             // QRCodeJS2 uses a different API
             new QRCode(qrContainer, {
