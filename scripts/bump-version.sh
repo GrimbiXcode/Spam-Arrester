@@ -42,7 +42,7 @@ new_version="${new_tag#v}"
 cd "$root_dir/bot"
 npm version "$new_version" --no-git-tag-version >/dev/null
 
-default_msg="chore: bump version to $new_version"
+default_msg="release: $new_version"
 read -r -p "Commit message [$default_msg]: " commit_msg
 commit_msg="${commit_msg:-$default_msg}"
 
