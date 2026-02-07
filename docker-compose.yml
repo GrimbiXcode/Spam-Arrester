@@ -30,7 +30,7 @@ services:
       # Sessions directory (mounted into agent containers)
       - ./sessions:/app/sessions
       # Config directory (shared with agent containers)
-      - ./config:/app/config:ro
+      - ./config:/app/config
     restart: unless-stopped
     networks:
       - agent-network

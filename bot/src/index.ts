@@ -1,11 +1,28 @@
 import 'dotenv/config';
-import { resolve } from 'path';
+import { resolve, join } from 'path';
+import { promises as fs } from 'fs';
 import { createBot } from './bot';
 import { DatabaseManager } from './db/database';
 import { ContainerManager } from './services/containerManager';
 import { WebApiServer } from './webApi';
 import { setWebApiRef } from './commands/start';
 import { logger } from './utils/logger';
+import { defaultConfigTemplate } from './config/defaultConfig';
+
+async function ensureDefaultConfig(configDir: string): Promise<void> {
+  const defaultConfigPath = join(configDir, 'default.json');
+
+  try {
+    await fs.access(defaultConfigPath);
+    return;
+  } catch {
+    // File does not exist; create it from template.
+  }
+
+  await fs.mkdir(configDir, { recursive: true });
+  await fs.writeFile(defaultConfigPath, JSON.stringify(defaultConfigTemplate, null, 2), 'utf-8');
+  logger.info({ defaultConfigPath }, 'Created missing default config');
+}
 
 async function main() {
   // Validate required environment variables
@@ -30,6 +47,8 @@ async function main() {
   const hostConfigDir = process.env.HOST_CONFIG_DIR; // Host path for Docker-in-Docker
   const agentImage = process.env.AGENT_IMAGE || 'spam-arrester-agent:latest';
   const networkName = process.env.AGENT_NETWORK || 'spam-arrester_agent-network';
+
+  await ensureDefaultConfig(configDir);
 
   const containerMgr = new ContainerManager(
     dockerSocket,
