@@ -3,7 +3,9 @@ set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 agent_pkg="$root_dir/agent/package.json"
+agent_pkg_lock="$root_dir/agent/package-lock.json"
 bot_pkg="$root_dir/bot/package.json"
+bot_pkg_lock="$root_dir/bot/package-lock.json"
 
 get_version() {
   node -p "require('$1').version"
@@ -46,7 +48,7 @@ default_msg="release: $new_version"
 read -r -p "Commit message [$default_msg]: " commit_msg
 commit_msg="${commit_msg:-$default_msg}"
 
-git -C "$root_dir" add "$agent_pkg" "$bot_pkg"
+git -C "$root_dir" add "$agent_pkg" "$agent_pkg_lock" "$bot_pkg" "$bot_pkg_lock"
 git -C "$root_dir" commit -m "$commit_msg"
 
 if git -C "$root_dir" rev-parse -q --verify "refs/tags/v$new_version" >/dev/null; then
@@ -55,4 +57,14 @@ if git -C "$root_dir" rev-parse -q --verify "refs/tags/v$new_version" >/dev/null
 fi
 
 git -C "$root_dir" tag "v$new_version"
-echo "Updated both projects to $new_version and created git tag v$new_version."
+read -r -p "Push commit and tag now? [y/N]: " do_push
+case "${do_push:-n}" in
+  [yY]|[yY][eE][sS])
+    git -C "$root_dir" push
+    git -C "$root_dir" push --tags
+    echo "Updated both projects to $new_version, created tag v$new_version, and pushed."
+    ;;
+  *)
+    echo "Updated both projects to $new_version and created git tag v$new_version."
+    ;;
+esac
