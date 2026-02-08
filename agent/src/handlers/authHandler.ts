@@ -9,6 +9,8 @@ export class AuthHandler {
   private phoneNumber: string | null = null;
   private qrCodeLink: string | null = null;
   private authState: string = 'none';
+  private lastTdlibState: string | null = null;
+  private pendingQrRequest = false;
 
   /**
    * Set up authorization state handler for TDLib client
@@ -26,6 +28,7 @@ export class AuthHandler {
    */
   private async handleAuthState(client: Client, authState: any): Promise<void> {
     logger.info({ authState: authState._ }, 'Authorization state changed');
+    this.lastTdlibState = authState._;
 
     switch (authState._) {
       case 'authorizationStateWaitTdlibParameters':
@@ -36,6 +39,14 @@ export class AuthHandler {
         // Signal to orchestrator that we need phone number
         this.authState = 'wait_phone';
         logger.info({ event: 'AUTH_WAIT_PHONE' }, 'Waiting for phone number');
+        if (this.pendingQrRequest) {
+          this.pendingQrRequest = false;
+          try {
+            await this.requestQrCodeInternal(client);
+          } catch (error) {
+            logger.error({ error }, 'Failed to request deferred QR code');
+          }
+        }
         break;
 
       case 'authorizationStateWaitOtherDeviceConfirmation':
@@ -148,17 +159,40 @@ export class AuthHandler {
     logger.info({ event: 'AUTH_QR_REQUESTED' }, 'Requesting QR code authentication');
     
     try {
-      // Request QR code authentication
-      await client.invoke({
-        _: 'requestQrCodeAuthentication',
-        other_user_ids: [], // Empty means any user can log in
-      });
-      this.authState = 'wait_qr';
-      logger.info('QR code authentication requested');
+      if (!this.lastTdlibState || this.lastTdlibState === 'authorizationStateWaitTdlibParameters') {
+        this.pendingQrRequest = true;
+        this.authState = 'wait_qr';
+        logger.info('TDLib not ready yet; deferring QR code request');
+        return;
+      }
+
+      if (this.lastTdlibState === 'authorizationStateWaitOtherDeviceConfirmation') {
+        this.authState = 'wait_qr_confirmation';
+        logger.info('QR code already active');
+        return;
+      }
+
+      if (this.lastTdlibState === 'authorizationStateReady') {
+        this.authState = 'ready';
+        logger.info('Already authenticated; skipping QR code request');
+        return;
+      }
+
+      await this.requestQrCodeInternal(client);
     } catch (error) {
       logger.error({ error }, 'Failed to request QR code');
       throw error;
     }
+  }
+
+  private async requestQrCodeInternal(client: Client): Promise<void> {
+    // Request QR code authentication
+    await client.invoke({
+      _: 'requestQrCodeAuthentication',
+      other_user_ids: [], // Empty means any user can log in
+    });
+    this.authState = 'wait_qr';
+    logger.info('QR code authentication requested');
   }
 
   /**

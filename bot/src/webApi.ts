@@ -170,17 +170,10 @@ export class WebApiServer {
           this.db.createContainer(telegramId, dockerContainerId);
           await this.waitForContainer(containerName, 30000);
           
-          // Request QR code from agent
-          const authStatus = await this.containerMgr.getAuthStatus(containerName);
-          if (authStatus === 'wait_phone' || authStatus === 'none') {
-            await this.containerMgr.requestQrCode(containerName);
-          }
+          await this.requestQrWhenReady(containerName, 10000);
         } else if (containerStatus.status === 'running') {
           // Container exists and is running, check if we need to request QR
-          const authStatus = await this.containerMgr.getAuthStatus(containerName);
-          if (authStatus === 'wait_phone' || authStatus === 'none') {
-            await this.containerMgr.requestQrCode(containerName);
-          }
+          await this.requestQrWhenReady(containerName, 10000);
         }
 
         // Store session (no phone needed since we have real telegram ID)
@@ -286,19 +279,10 @@ export class WebApiServer {
           // Wait for container to start
           await this.waitForContainer(containerName, 30000);
           
-          // Request QR code from agent (only if not already in QR mode)
-          const authStatus = await this.containerMgr.getAuthStatus(containerName);
-          if (authStatus === 'wait_phone' || authStatus === 'none') {
-            // Agent is waiting for phone, request QR code instead
-            await this.containerMgr.requestQrCode(containerName);
-          }
-          // Otherwise, agent already started in QR mode, no need to request
+          await this.requestQrWhenReady(containerName, 10000);
         } else if (containerStatus.status === 'running') {
           // Container exists and is running, check if we need to request QR
-          const authStatus = await this.containerMgr.getAuthStatus(containerName);
-          if (authStatus === 'wait_phone' || authStatus === 'none') {
-            await this.containerMgr.requestQrCode(containerName);
-          }
+          await this.requestQrWhenReady(containerName, 10000);
         }
 
         // Store session
@@ -521,6 +505,38 @@ export class WebApiServer {
     }
     
     throw new Error('Agent HTTP server start timeout');
+  }
+
+  /**
+   * Request QR code only after TDLib reached a compatible auth state.
+   */
+  private async requestQrWhenReady(containerName: string, timeout: number): Promise<void> {
+    const startTime = Date.now();
+    let lastStatus = 'none';
+
+    while (Date.now() - startTime < timeout) {
+      const authStatus = await this.containerMgr.getAuthStatus(containerName);
+      lastStatus = authStatus;
+
+      if (authStatus === 'wait_phone') {
+        await this.containerMgr.requestQrCode(containerName);
+        return;
+      }
+
+      if (
+        authStatus === 'wait_qr' ||
+        authStatus === 'wait_qr_confirmation' ||
+        authStatus === 'wait_code' ||
+        authStatus === 'wait_password' ||
+        authStatus === 'ready'
+      ) {
+        return;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    logger.warn({ containerName, lastStatus }, 'Timed out waiting for agent auth state before requesting QR code');
   }
 
   /**

@@ -135,6 +135,13 @@ describe('AuthHandler', () => {
     it('should request QR code authentication from TDLib', async () => {
       mockInvoke.mockResolvedValue(undefined);
 
+      await updateHandler({
+        _: 'updateAuthorizationState',
+        authorization_state: {
+          _: 'authorizationStateWaitPhoneNumber',
+        },
+      });
+
       await authHandler.requestQrCode(mockClient as any);
 
       expect(mockInvoke).toHaveBeenCalledWith({
@@ -148,7 +155,35 @@ describe('AuthHandler', () => {
       const error = new Error('TDLib error');
       mockInvoke.mockRejectedValue(error);
 
+      await updateHandler({
+        _: 'updateAuthorizationState',
+        authorization_state: {
+          _: 'authorizationStateWaitPhoneNumber',
+        },
+      });
+
       await expect(authHandler.requestQrCode(mockClient as any)).rejects.toThrow('TDLib error');
+    });
+
+    it('should defer QR code request until TDLib is ready', async () => {
+      mockInvoke.mockResolvedValue(undefined);
+
+      await authHandler.requestQrCode(mockClient as any);
+
+      expect(mockInvoke).not.toHaveBeenCalled();
+      expect(authHandler.getAuthState()).toBe('wait_qr');
+
+      await updateHandler({
+        _: 'updateAuthorizationState',
+        authorization_state: {
+          _: 'authorizationStateWaitPhoneNumber',
+        },
+      });
+
+      expect(mockInvoke).toHaveBeenCalledWith({
+        _: 'requestQrCodeAuthentication',
+        other_user_ids: [],
+      });
     });
   });
 
