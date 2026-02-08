@@ -1,5 +1,6 @@
 import Docker from 'dockerode';
-import { resolve } from 'path';
+import { promises as fs } from 'fs';
+import { join, resolve } from 'path';
 import { logger } from '../utils/logger';
 import type { DatabaseManager, UserSettings } from '../db/database';
 
@@ -18,6 +19,8 @@ export class ContainerManager {
   private hostConfigDir: string;
   private agentImage: string;
   private networkName: string;
+  private agentUid: number;
+  private agentGid: number;
 
   constructor(
     dockerSocket: string,
@@ -36,6 +39,26 @@ export class ContainerManager {
     this.hostConfigDir = hostConfigDir || this.configDir;
     this.agentImage = agentImage;
     this.networkName = networkName;
+    this.agentUid = parseInt(process.env.AGENT_UID || '1001', 10);
+    this.agentGid = parseInt(process.env.AGENT_GID || '1001', 10);
+  }
+
+  private async ensureSessionDir(telegramId: number): Promise<void> {
+    const sessionDir = join(this.sessionsDir, telegramId.toString());
+
+    try {
+      await fs.mkdir(sessionDir, { recursive: true });
+
+      try {
+        await fs.chown(sessionDir, this.agentUid, this.agentGid);
+        await fs.chmod(sessionDir, 0o700);
+      } catch (error) {
+        logger.warn({ sessionDir, error }, 'Failed to chown session dir, falling back to permissive mode');
+        await fs.chmod(sessionDir, 0o777);
+      }
+    } catch (error) {
+      logger.warn({ sessionDir, error }, 'Failed to prepare session directory');
+    }
   }
 
   async createContainer(config: ContainerConfig): Promise<string> {
@@ -45,6 +68,8 @@ export class ContainerManager {
     logger.info({ telegramId, containerName }, 'Creating agent container');
 
     try {
+      await this.ensureSessionDir(telegramId);
+
       // Check if container already exists
       const existing = await this.getContainer(containerName);
       if (existing) {
