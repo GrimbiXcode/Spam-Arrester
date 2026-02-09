@@ -44,13 +44,19 @@ export class ActionHandler {
   }
 
   private determineAction(detection: SpamDetectionResult): 'block' | 'archive' | 'log' {
+    const canBlock = config.actions.enableDeletion;
+
     if (detection.score >= config.thresholds.actionThreshold) {
-      return config.actions.enableDeletion ? 'block' : 'archive';
+      return canBlock ? 'block' : 'archive';
     }
+
     const defaultAction = config.actions.defaultAction;
     // Ensure defaultAction is compatible with our return type
     if (defaultAction === 'delete') {
-      return 'block'; // Map 'delete' to 'block' for backwards compatibility
+      return canBlock ? 'block' : 'archive'; // Map 'delete' to 'block' for backwards compatibility
+    }
+    if (defaultAction === 'block') {
+      return canBlock ? 'block' : 'archive';
     }
     return defaultAction;
   }

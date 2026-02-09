@@ -31,7 +31,7 @@ interface Config {
     checkPhoneNumbers: boolean;
   };
   actions: {
-    defaultAction: 'archive' | 'delete' | 'log';
+    defaultAction: 'archive' | 'delete' | 'log' | 'block';
     enableBlocking: boolean;
     enableDeletion: boolean;
     removeFromChatList: boolean;
@@ -40,6 +40,29 @@ interface Config {
   logging: {
     level: string;
   };
+}
+
+function readNumber(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function readBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  const normalized = value.toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+  return fallback;
+}
+
+function normalizeAction(value: string | undefined, fallback: Config['actions']['defaultAction']) {
+  if (!value) return fallback;
+  const normalized = value.toLowerCase();
+  if (normalized === 'archive' || normalized === 'log' || normalized === 'delete' || normalized === 'block') {
+    return normalized as Config['actions']['defaultAction'];
+  }
+  return fallback;
 }
 
 function loadConfig(): Config {
@@ -54,6 +77,25 @@ function loadConfig(): Config {
     throw new Error('TG_API_ID and TG_API_HASH must be set in environment variables');
   }
 
+  const thresholds = {
+    ...configFile.thresholds,
+    lowThreshold: readNumber(process.env.LOW_THRESHOLD, configFile.thresholds.lowThreshold),
+    actionThreshold: readNumber(process.env.ACTION_THRESHOLD, configFile.thresholds.actionThreshold),
+    vectorSimilarityCutoff: readNumber(
+      process.env.VECTOR_SIMILARITY_CUTOFF,
+      configFile.thresholds.vectorSimilarityCutoff
+    ),
+  };
+
+  const actions = {
+    ...configFile.actions,
+    defaultAction: normalizeAction(process.env.DEFAULT_ACTION, configFile.actions.defaultAction),
+    enableDeletion: readBoolean(process.env.ENABLE_DELETION, configFile.actions.enableDeletion),
+    enableBlocking: readBoolean(process.env.ENABLE_BLOCKING, configFile.actions.enableBlocking),
+    removeFromChatList: readBoolean(process.env.REMOVE_FROM_CHAT_LIST, configFile.actions.removeFromChatList),
+    revokeMessages: readBoolean(process.env.REVOKE_MESSAGES, configFile.actions.revokeMessages),
+  };
+
   return {
     telegram: {
       apiId: parseInt(apiId, 10),
@@ -61,10 +103,10 @@ function loadConfig(): Config {
       phoneNumber: process.env.TG_PHONE_NUMBER,
       ...configFile.tdlib,
     },
-    thresholds: configFile.thresholds,
+    thresholds,
     rateLimits: configFile.rateLimits,
     detection: configFile.detection,
-    actions: configFile.actions,
+    actions,
     logging: {
       level: process.env.LOG_LEVEL || 'info',
     },

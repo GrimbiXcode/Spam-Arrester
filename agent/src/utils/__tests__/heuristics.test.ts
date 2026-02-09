@@ -25,18 +25,20 @@ describe('heuristics', () => {
         expect(looksSpam('HTTPS://EXAMPLE.COM in caps')).toBe(true);
       });
 
-      it('should detect t.me links', () => {
-        expect(looksSpam('Join t.me/spamchannel')).toBe(true);
-        expect(looksSpam('Contact me at T.ME/username')).toBe(true);
-        expect(looksSpam('t.me/joinchat/abc123')).toBe(true);
+      it('should detect t.me links with another indicator', () => {
+        // Single t.me link is one indicator; need 2 indicators to flag spam
+        expect(looksSpam('Join t.me/spamchannel now!!!')).toBe(true); // link + excess punct
+        expect(looksSpam('Contact me at T.ME/username @user123')).toBe(true); // link + handle
+        expect(looksSpam('t.me/joinchat/abc123 +1234567890')).toBe(true); // link + phone
       });
     });
 
     describe('Handle detection', () => {
-      it('should detect @ mentions with valid usernames', () => {
-        expect(looksSpam('Contact @spammer for deals')).toBe(true);
-        expect(looksSpam('DM @user123 now')).toBe(true);
-        expect(looksSpam('@spam_channel has offers')).toBe(true);
+      it('should detect @ mentions with another indicator', () => {
+        // Single handle is one indicator; need 2 indicators to flag spam
+        expect(looksSpam('Contact @spammer for deals!!!')).toBe(true); // handle + excess punct
+        expect(looksSpam('DM @user123 now URGENT')).toBe(true); // handle + urgency
+        expect(looksSpam('@spam_channel has crypto offers')).toBe(true); // handle + money bait (high risk)
       });
 
       it('should not detect short handles (less than 3 chars)', () => {
@@ -44,29 +46,33 @@ describe('heuristics', () => {
         expect(looksSpam('at is too short')).toBe(false);
       });
 
-      it('should detect handles with underscores and numbers', () => {
-        expect(looksSpam('Follow @user_name_123')).toBe(true);
-        expect(looksSpam('@test_user')).toBe(true);
+      it('should detect handles with underscores and numbers combined with other indicators', () => {
+        // Single handle is one indicator; need 2 indicators to flag spam
+        expect(looksSpam('Follow @user_name_123 ASAP')).toBe(true); // handle + urgency
+        expect(looksSpam('@test_user earn money now')).toBe(true); // handle + money bait (high risk)
       });
     });
 
     describe('Phone number detection', () => {
-      it('should detect phone numbers with country codes', () => {
-        expect(looksSpam('Call me +1234567890')).toBe(true);
-        expect(looksSpam('+44 20 1234 5678')).toBe(true);
-        expect(looksSpam('+7 (999) 123-45-67')).toBe(true);
+      it('should detect phone numbers with country codes and another indicator', () => {
+        // Single phone is one indicator; need 2 indicators to flag spam
+        expect(looksSpam('Call me +1234567890 URGENT')).toBe(true); // phone + urgency
+        expect(looksSpam('+44 20 1234 5678 contact me')).toBe(true); // phone + contact bait
+        expect(looksSpam('+7 (999) 123-45-67 @username')).toBe(true); // phone + handle
       });
 
-      it('should detect phone numbers without country codes', () => {
-        expect(looksSpam('Call 123-456-7890')).toBe(true);
-        expect(looksSpam('Phone: (555) 123-4567')).toBe(true);
-        expect(looksSpam('Contact: 555.123.4567')).toBe(true);
+      it('should detect phone numbers without country codes with another indicator', () => {
+        // Single phone is one indicator; need 2 indicators to flag spam
+        expect(looksSpam('Call 123-456-7890 NOW!!!')).toBe(true); // phone + excess punct
+        expect(looksSpam('Phone: (555) 123-4567 dm me')).toBe(true); // phone + contact bait
+        expect(looksSpam('Contact: 555.123.4567 URGENT')).toBe(true); // phone + urgency
       });
 
-      it('should detect phone numbers with various formats', () => {
-        expect(looksSpam('123 456 7890')).toBe(true);
-        expect(looksSpam('(123)456-7890')).toBe(true);
-        expect(looksSpam('1-800-555-5555')).toBe(true);
+      it('should detect phone numbers with various formats and another indicator', () => {
+        // Single phone is one indicator; need 2 indicators to flag spam
+        expect(looksSpam('123 456 7890 act now')).toBe(true); // phone + urgency
+        expect(looksSpam('(123)456-7890 message me')).toBe(true); // phone + contact bait
+        expect(looksSpam('1-800-555-5555 URGENT')).toBe(true); // phone + urgency
       });
 
       it('should not detect short digit sequences', () => {
@@ -81,10 +87,58 @@ describe('heuristics', () => {
         expect(looksSpam('Join t.me/channel and call +44 123 456 7890')).toBe(true);
       });
 
-      it('should detect messages with any single spam indicator', () => {
-        expect(looksSpam('Only has @username here')).toBe(true);
+      it('should require at least two indicators for non-high-risk patterns', () => {
+        // Single indicators alone should NOT trigger spam
+        expect(looksSpam('Only has @username here')).toBe(false);
+        expect(looksSpam('Only has +1234567890')).toBe(false);
+        // Note: URLs trigger both hasLink and hasObfuscatedUrl (2 indicators), so they flag spam
         expect(looksSpam('Only has https://link.com')).toBe(true);
-        expect(looksSpam('Only has +1234567890')).toBe(true);
+        // Multiple indicators together should trigger spam
+        expect(looksSpam('@username https://link.com')).toBe(true);
+      });
+    });
+
+    describe('Additional patterns', () => {
+      it('should detect money/crypto bait', () => {
+        expect(looksSpam('Bitcoin giveaway! Earn $500 now')).toBe(true);
+        expect(looksSpam('USDT airdrop is live, claim bonus')).toBe(true);
+      });
+
+      it('should detect delivery phishing language', () => {
+        expect(looksSpam('DHL delivery pending, pay fee via link')).toBe(true);
+        expect(looksSpam('UPS parcel: confirm tracking link')).toBe(true);
+      });
+
+      it('should detect scam keyword prompts', () => {
+        expect(looksSpam('Verify your account now to avoid suspension')).toBe(true);
+        expect(looksSpam('Confirm your login credentials ASAP')).toBe(true);
+      });
+
+      it('should detect obfuscated URLs', () => {
+        expect(looksSpam('Visit hxxp://bad.site now')).toBe(true);
+        expect(looksSpam('go to example dot com for bonus')).toBe(true);
+      });
+
+      it('should require multiple weak indicators', () => {
+        // "URGENT!!!" has urgency + excess punctuation = 2 indicators
+        expect(looksSpam('URGENT!!!')).toBe(true);
+        // "CONTACT ME ASAP" only has urgency (asap) = 1 indicator
+        expect(looksSpam('CONTACT ME ASAP')).toBe(false);
+        expect(looksSpam('URGENT!!! Contact @spam_now')).toBe(true);
+      });
+
+      it('should not flag very short messages alone (needs 2 indicators)', () => {
+        // Very short (<=3 chars) is only 1 indicator; need 2 to flag spam
+        expect(looksSpam('hi')).toBe(false);
+        expect(looksSpam('ok')).toBe(false);
+        expect(looksSpam('yo')).toBe(false);
+        // Short message with another indicator
+        expect(looksSpam('hi!')).toBe(false); // short but only 1 exclamation mark, not 3+
+        // "yo!!!" is 5 chars, so isVeryShort=false; only hasExcessPunct=true (1 indicator)
+        expect(looksSpam('yo!!!')).toBe(false);
+        // Truly short + excess punct: "a!!!" is 4 chars > 3, so not short enough
+        // Need 2 indicators: short (<=3) + something else
+        expect(looksSpam('hi!!! URGENT')).toBe(true); // excess punct + urgency = 2 indicators
       });
     });
   });
